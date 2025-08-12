@@ -2,3 +2,8 @@ beautifulsoup4
 requests
 lxml
 pandas
+pdfplumber
+pymupdf
+pytesseract
+Pillow
+rapidfuzz
