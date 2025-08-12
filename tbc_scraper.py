@@ -7,7 +7,7 @@ Env knobs (set in GitHub Actions step `env:`):
   - TBC_VERIFY_SSL: "true" | "false"   -> if "false", retry without TLS verification on SSLError (TBC host only)
   - SEED_ONLY:      "true" | "false"   -> if "true", only parse the seed pages (faster)
   - MAX_PAGES:      integer            -> crawl breadth cap (default 800)
-  - PRINT_EVERY:    integer            -> print heartbeat every N pages (default 25)
+  - PRINT_EVERY:    integer            -> heartbeat frequency (default 25)
 """
 
 import os
@@ -16,6 +16,7 @@ import sys
 import time
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
+from datetime import datetime
 
 import pandas as pd
 import requests
@@ -27,11 +28,13 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE = "https://www.theborderconsortium.org/"
+CUR_YEAR = datetime.utcnow().year  # stop at current year so we don't hit future years
+
 START_URLS = [
     # Main index
     "https://www.theborderconsortium.org/resources/key-resources/camp-population/",
-    # Yearly categories (wide net; harmless if a year is missing)
-    *[f"https://www.theborderconsortium.org/category/camp-populations-{y}/" for y in range(1990, 2031)],
+    # Yearly categories (1990..current year inclusive)
+    *[f"https://www.theborderconsortium.org/category/camp-populations-{y}/" for y in range(1990, CUR_YEAR + 1)],
     # WordPress site search pages that often surface older media/posts
     "https://www.theborderconsortium.org/?s=camp+population+map",
     "https://www.theborderconsortium.org/?s=camp+populations",
@@ -39,7 +42,7 @@ START_URLS = [
 ]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Scraper-Index/1.3; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Scraper-Index/1.4; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
@@ -131,7 +134,10 @@ def looks_like_map_file(href: str) -> bool:
     href_l = href.lower()
     if not href_l.endswith(EXT_OK):
         return False
-    return any(k in href_l for k in KEYWORDS)
+    # Heuristic: must contain "map" plus at least one other keyword
+    if "map" not in href_l:
+        return False
+    return any(k in href_l for k in ("camp", "population", "unhcr"))
 
 # --- HTTP helpers with SSL fallback ---
 def get(url: str) -> requests.Response:
@@ -146,6 +152,8 @@ def get(url: str) -> requests.Response:
             r = requests.get(url, headers=HEADERS, timeout=20, verify=False)
             r.raise_for_status()
             return r
+        raise
+    except Exception as e:
         raise
 
 def soup(url: str):
@@ -168,7 +176,7 @@ def crawl(max_pages: int = MAX_PAGES) -> pd.DataFrame:
             continue
         seen_pages.add(url)
 
-        if PRINT_EVERY and (len(seen_pages) % PRINT_EVERY == 0):
+        if PRINT_EVERY and (len(seen_pages) % PRINT_EVERY == 0 or len(seen_pages) == 1):
             print(f"[progress] visited={len(seen_pages)} queued={len(to_visit)} found={len(found)} now={url}", flush=True)
 
         s = soup(url)
@@ -213,10 +221,12 @@ def crawl(max_pages: int = MAX_PAGES) -> pd.DataFrame:
     if df.empty:
         return df  # zero rows but with headers
 
-    # Deduplicate by source_url; prefer entries that have a parsed date
-    df = df.sort_values(["source_url", df["report_date"].eq("").astype(int)]).drop_duplicates("source_url", keep="first")
+    # Prefer rows with a parsed date when deduping by source_url
+    df["has_date"] = df["report_date"].astype(str).str.len().gt(0).astype(int)  # 1 if has date, else 0
+    df = df.sort_values(["source_url", "has_date"], ascending=[True, False]).drop_duplicates("source_url", keep="first")
+    df = df.drop(columns=["has_date"])
 
-    # Sort by date then filename
+    # Sort by parsed date then filename
     with pd.option_context("mode.use_inf_as_na", True):
         df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce")
     df = df.sort_values(["report_date", "file_name"], na_position="last")
