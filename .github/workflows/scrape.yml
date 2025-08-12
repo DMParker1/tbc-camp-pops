@@ -11,6 +11,8 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +32,11 @@ jobs:
         env:
           # Leave false so the scraper will retry without verification on SSLError
           TBC_VERIFY_SSL: "false"
+          # Fast mode for initial run (speeds things up). Flip to "false" later.
+          SEED_ONLY: "true"
+          # Reasonable limits for a quick pass; increase later if needed.
+          MAX_PAGES: "200"
+          PRINT_EVERY: "10"
         run: python tbc_scraper.py
 
       - name: Summarize run (empty-CSV safe)
@@ -59,6 +66,21 @@ jobs:
             )
           else:
             print(f"rows={rows}, earliest={earliest}, latest={latest}")
+          PY
+
+      - name: Show sample rows
+        run: |
+          python - <<'PY'
+          import pandas as pd, pathlib
+          p = pathlib.Path("data/derived/sources_index.csv")
+          if p.exists() and p.stat().st_size:
+              df = pd.read_csv(p)
+              print("\nHEAD(10):")
+              print(df.head(10).to_string(index=False))
+              print("\nTAIL(10):")
+              print(df.tail(10).to_string(index=False))
+          else:
+              print("sources_index.csv is empty")
           PY
 
       - name: Commit index CSV
