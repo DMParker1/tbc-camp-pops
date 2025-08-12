@@ -24,7 +24,11 @@ on:
       seed_only:
         description: "SEED_ONLY (true|false)"
         required: false
-        default: "false"
+        default: "true"
+      skip_crawl:
+        description: "Skip crawler step (use existing sources_index.csv)"
+        required: false
+        default: "true"
 
 permissions:
   contents: write
@@ -58,18 +62,19 @@ jobs:
           restore-keys: |
             raw-cache-${{ runner.os }}-
 
-      # Step 1 — crawl & index
+      # Step 1 — crawl & index (runs on schedule; skipped by default on manual runs)
       - name: Crawl + index links (no OCR yet)
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_crawl != 'true' }}
         env:
           TBC_VERIFY_SSL: "false"
-          SEED_ONLY: "${{ inputs.seed_only || 'false' }}"
+          SEED_ONLY: "${{ inputs.seed_only || 'true' }}"
           MAX_PAGES: "800"
           PRINT_EVERY: "10"
           STOP_AFTER_FOUND: "${{ inputs.stop_after_found || '1500' }}"
           PYTHONUNBUFFERED: "1"
         run: python -u tbc_scraper.py
 
-      # Step 2 — incremental extract
+      # Step 2 — extract & OCR
       - name: Extract populations (OCR/PDF parsing)
         env:
           PYTHONUNBUFFERED: "1"
@@ -101,8 +106,9 @@ jobs:
               dfl = pd.read_csv(long)
               rows_long = len(dfl)
               if rows_long and "report_date" in dfl.columns:
-                earliest = dfl["report_date"].min()
-                latest   = dfl["report_date"].max()
+                dfl["report_date"] = pd.to_datetime(dfl["report_date"], errors="coerce")
+                earliest = str(dfl["report_date"].min().date())
+                latest   = str(dfl["report_date"].max().date())
             except Exception as e:
               print(f"[warn] could not read tbc_camp_population_long.csv: {e}")
           summ = Path(os.environ.get("GITHUB_STEP_SUMMARY", ""))
@@ -123,9 +129,9 @@ jobs:
           p = pathlib.Path("data/derived/tbc_camp_population_long.csv")
           if p.exists() and p.stat().st_size:
               df = pd.read_csv(p)
-              print("\nLATEST MONTH SAMPLE:")
               df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce")
               latest = df["report_date"].max()
+              print("\nLATEST MONTH SAMPLE:")
               print(df[df["report_date"]==latest].head(15).to_string(index=False))
           else:
               print("No extracted rows yet.")
