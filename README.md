@@ -1,12 +1,20 @@
-# TBC Camp Populations — Link Index (Step 1)
-
-This step crawls The Border Consortium’s “Camp Population” pages and builds a CSV index of monthly map files (PDF/JPG/PNG), parsing dates from both numeric (e.g., `2025-06`) and month-name formats (e.g., `Aug-95`, `September-1999`). No OCR/extraction yet—Step 2 will add that.
+# TBC Camp Populations
 
 ![scrape status](https://github.com/DMParker1/tbc-camp-pops/actions/workflows/scrape.yml/badge.svg)
 
-## Output
-- `data/derived/sources_index.csv` — columns: `report_date`, `source_url`, `file_name`, `origin_page`, `date_parse_method`
+_Last updated: 2025-08-12 20:16 UTC_
 
-## How to run
+**Latest month:** **2025-06**
 
-Go to **Actions → scrape-and-index → Run workflow** (or wait for the cron).
+Below are the per-camp population counts parsed from TBC map(s) for the latest month.  
+(See CSVs below for full history and parsing notes.)
+
+| camp_name | population | category |
+| --- | --- | --- |
+| June | 2025 | refugee |
+
+## Data files
+
+- `data/derived/tbc_camp_population_long.csv` — long/tidy (all months, all camps)
+- `data/derived/tbc_camp_population_wide.csv` — pivot (camps as columns)
+
