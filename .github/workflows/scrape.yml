@@ -25,17 +25,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # Keep CA bundle fresh; scraper/extractor also have SSL fallback
           python -m pip install --upgrade certifi
+          # OCR engine for pytesseract
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
 
-      # Step 1 — crawl & index (you already have this)
+      # Step 1 — crawl & index
       - name: Crawl + index links (no OCR yet)
         env:
+          # Let the scraper retry without verification on SSLError
           TBC_VERIFY_SSL: "false"
-          SEED_ONLY: "false"     # go deep now that it's working
+          # Go deep (set to "true" for a fast seed-only pass)
+          SEED_ONLY: "false"
+          # Crawl breadth and heartbeat
           MAX_PAGES: "2000"
           PRINT_EVERY: "25"
+          # Force unbuffered Python for live logs
           PYTHONUNBUFFERED: "1"
         run: python -u tbc_scraper.py
 
@@ -43,6 +49,8 @@ jobs:
       - name: Extract populations (OCR/PDF parsing)
         env:
           PYTHONUNBUFFERED: "1"
+          # Keep extractor in the same SSL mode as scraper
+          TBC_VERIFY_SSL: "false"
         run: python -u tbc_extract.py
 
       - name: Summarize run
