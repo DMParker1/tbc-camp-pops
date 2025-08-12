@@ -2,17 +2,23 @@
 """
 Step 2: Download each source in data/derived/sources_index.csv and extract per-camp populations.
 
-Key improvements:
-- High-confidence parsing: capture numbers only within a short window AFTER each known camp label.
-- Strict noise filters: ignore years (e.g., 2025), month words ("June"), totals, and weird OCR junk.
-- Plausible ranges: global (50..300_000) and per-camp ranges (e.g., Mae La ~10k..70k).
-- Resume + cache: skips already-processed files; reuses data/raw downloads.
-- Wide CSV built with nullable ints (avoids overflow errors).
+New in this version:
+- Detects and tags series: series ∈ {"tbc", "tbbc", "unhcr", "unknown"}
+- Emits up to one row per (report_date, camp, series) per document
+- README/primary wide table picks a single value per (report_date, camp) by preference:
+  tbc/tbbc > unhcr > unknown
+
+Other features kept:
+- High-confidence parsing: only numbers within a short window AFTER each known camp label
+- Reject months, totals, obvious 4-digit years, HH (household) counts
+- Global and per-camp plausibility ranges
+- Resume + cache: skips already-processed files; reuses data/raw/ downloads
+- Robust wide pivot using nullable integers
 
 Outputs:
-  - data/derived/tbc_camp_population_long.csv
-  - data/derived/tbc_camp_population_wide.csv
-  - data/raw/<files>  (cached artifacts)
+  - data/derived/tbc_camp_population_long.csv     (with 'series' column)
+  - data/derived/tbc_camp_population_wide.csv     (preferred series per camp/date)
+  * (Optionally add per-series wides later if desired)
 
 Env knobs (set in workflow):
   - TBC_VERIFY_SSL: "true"|"false"   (default false; strict TLS if true)
@@ -26,7 +32,6 @@ Env knobs (set in workflow):
 import os, io, re, sys, time, logging
 from pathlib import Path
 from urllib.parse import urlparse
-from datetime import datetime
 import pandas as pd
 import requests
 import urllib3
@@ -36,13 +41,14 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
 logging.getLogger("pdfplumber").setLevel(logging.ERROR)
 
-# --- Config & env ---
+# --- Paths ---
 RAW_DIR      = Path("data/raw")
 DERIVED_DIR  = Path("data/derived")
 INDEX_CSV    = DERIVED_DIR / "sources_index.csv"
 OUT_LONG     = DERIVED_DIR / "tbc_camp_population_long.csv"
 OUT_WIDE     = DERIVED_DIR / "tbc_camp_population_wide.csv"
 
+# --- Env ---
 EXTRACT_SINCE     = os.getenv("EXTRACT_SINCE", "").strip()
 EXTRACT_MAX_FILES = int(os.getenv("EXTRACT_MAX_FILES", "250"))
 PROCESS_ORDER     = os.getenv("PROCESS_ORDER", "newest").lower()
@@ -50,17 +56,15 @@ RESUME_MODE       = os.getenv("RESUME_MODE", "true").lower() == "true"
 OCR_DPI           = int(os.getenv("OCR_DPI", "200"))
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/1.3; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/2.0; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# Known camps (canonical labels)
+# --- Camps & aliases ---
 KNOWN_CAMPS = [
     "Ban Mai Nai Soi","Ban Mae Surin","Mae La Oon","Mae Ra Ma Luang",
     "Mae La","Umpiem Mai","Nupo","Ban Don Yang","Tham Hin"
 ]
-
-# Common OCR alias forms -> canonical
 ALIASES = {
     "ban mainai soi": "Ban Mai Nai Soi",
     "ban mai nai soi": "Ban Mai Nai Soi",
@@ -78,7 +82,6 @@ ALIASES = {
     "thamhin": "Tham Hin",
 }
 
-# Month words & stopwords to exclude as "labels"
 MONTH_WORDS = {
     "jan","january","feb","february","mar","march","apr","april","may",
     "jun","june","jul","july","aug","august","sep","sept","september",
@@ -89,11 +92,11 @@ LABEL_STOPWORDS = {
     "thai myanmar border","myanmar thailand border","thailand myanmar border"
 }
 
-# Global plausible population range (helps reject OCR junk)
+# Global plausible range
 GLOBAL_MIN = 50
 GLOBAL_MAX = 300_000
 
-# Per-camp plausible ranges (broad on purpose; tune if needed)
+# Per-camp plausible ranges (broad, for sanity)
 CAMP_BOUNDS = {
     "Mae La":          (10_000,  70_000),
     "Umpiem Mai":      (3_000,   45_000),
@@ -106,7 +109,34 @@ CAMP_BOUNDS = {
     "Tham Hin":        (1_000,   25_000),
 }
 
-# --- HTTP (env-aware SSL + fallback) ---
+# Toggle generic fallback parser (kept OFF to avoid "June / 2025" noise)
+ENABLE_GENERIC_FALLBACK = False
+
+# --- Series detection ---
+SERIES_TOKENS = {
+    "unhcr":  [r"\bUNHCR\b", r"\bUN\s*HCR\b", r"\bU\.?N\.?H\.?C\.?R\b"],
+    "tbbc":   [r"\bTBBC\b", r"\bT\.?B\.?B\.?C\b"],
+    "tbc":    [r"\bTBC\b", r"\bThe\s+Border\s+Consortium\b"],
+}
+SERIES_PREF = ["tbc", "tbbc", "unhcr", "unknown"]
+
+def detect_series_near(text: str, center_pos: int, radius: int = 120) -> str:
+    """Look around center_pos for series tokens; return most specific match."""
+    lo = max(0, center_pos - radius)
+    hi = min(len(text), center_pos + radius)
+    around = text[lo:hi]
+    found = []
+    for series, patterns in SERIES_TOKENS.items():
+        for pat in patterns:
+            if re.search(pat, around, flags=re.IGNORECASE):
+                found.append(series)
+                break
+    if "tbbc" in found:    return "tbbc"
+    if "tbc" in found:     return "tbc"
+    if "unhcr" in found:   return "unhcr"
+    return "unknown"
+
+# --- HTTP helpers ---
 def get(url):
     verify_pref = os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"
     try:
@@ -142,7 +172,7 @@ def download(url, report_date):
     out.write_bytes(data)
     return out
 
-# --- Text extraction ---
+# --- Text extraction (PDF / image OCR) ---
 def extract_text_from_pdf(pdf_path):
     txt_all = []
     method = "pdf-text"
@@ -154,7 +184,6 @@ def extract_text_from_pdf(pdf_path):
                 if t.strip():
                     txt_all.append(t)
         combined = "\n".join(txt_all)
-        # If text is too sparse, OCR the images
         if len(combined.strip()) >= 300:
             return combined, method
         else:
@@ -204,164 +233,150 @@ def detect_category(text):
         return "idp"
     return "refugee"
 
-def canon_label(raw_label: str):
-    """Normalize and map OCR label -> canonical camp name when possible."""
-    if not raw_label:
-        return None
-    norm = re.sub(r"[^a-z]", " ", raw_label.lower()).strip()
-    key = re.sub(r"\s+", " ", norm)
-    if key in ALIASES:
-        return ALIASES[key]
-    # direct match after normalization
-    for camp in KNOWN_CAMPS:
-        if re.sub(r"[^a-z]", "", camp.lower()) == re.sub(r"[^a-z]", "", raw_label.lower()):
-            return camp
-    return None
-
 def build_camp_patterns():
-    """Compile regex patterns that match each camp label with minor OCR spacing/hyphen noise."""
     pats = {}
     for camp in KNOWN_CAMPS:
-        esc = re.escape(camp)
-        # Allow spaces/hyphens/underscores variability between words
         tokenized = r"[ _\-]*".join([re.escape(t) for t in camp.split()])
         pats[camp] = re.compile(rf"(?i)\b{tokenized}\b")
     return pats
 
 CAMP_PATS = build_camp_patterns()
 
-def extract_numbers_in_window(text_slice: str):
+def is_household_hint(around: str) -> bool:
+    return bool(re.search(r"\bHH\b|\bhouseholds?\b|\bhh:?\b", around, re.I))
+
+def extract_number_tokens(text_slice: str, base_offset: int):
     """
-    Return list of plausible ints found in a small window of text.
+    Yield dicts with numeric candidates found in text_slice:
+      {"val": int, "token": str, "start": abs_start, "end": abs_end}
     - Accept thousand separators , . or spaces; strip to digits.
-    - Reject years (1900..2200) and out-of-global-range values.
+    - Reject "plain 4-digit years" 1900..2100 (token must be exactly 4 digits).
+    - Enforce global min/max.
     """
-    nums = []
     for m in re.finditer(r"([0-9][0-9,\.\s]{1,12})", text_slice):
-        digits = re.sub(r"[^\d]", "", m.group(1))
+        token = m.group(1).strip()
+        digits = re.sub(r"[^\d]", "", token)
         if not digits or not digits.isdigit():
             continue
         val = int(digits)
-        # reject obvious years and out-of-range junk
-        if 1900 <= val <= 2200:
+        # treat as year only if token is exactly 4 digits (no separators)
+        is_plain_4digit = re.fullmatch(r"\d{4}", token) is not None
+        if is_plain_4digit and 1900 <= val <= 2100:
             continue
         if not (GLOBAL_MIN <= val <= GLOBAL_MAX):
             continue
-        nums.append(val)
-    return nums
-
-def is_household_hint(around: str) -> bool:
-    """Return True if nearby text suggests household counts, not population."""
-    return bool(re.search(r"\bHH\b|\bhouseholds?\b|\bhh:?\b", around, re.I))
+        yield {
+            "val": val,
+            "token": token,
+            "start": base_offset + m.start(),
+            "end": base_offset + m.end(),
+        }
 
 # --- Parsing core ---
 def parse_rows(text):
     """
-    Extract rows as dicts:
-      camp_name, population, category, parse_notes, parse_confidence
+    Return list of rows (dicts):
+      report_date (filled later), camp_name, population, category, series,
+      parse_notes, parse_confidence
     Strategy:
-      - For each known camp, search label; look +N chars ahead for plausible numbers.
-      - Prefer the largest plausible number near the label (often population vs HH).
-      - Enforce per-camp plausible bounds; drop if outside.
-      - As a fallback, consider generic label-number pairs but with strict filters.
+      - For each known camp, find label positions and look forward in a small window.
+      - For each candidate number, detect 'series' from nearby tokens.
+      - Enforce camp-specific plausible ranges; drop HH/total windows.
+      - Keep at most one row per (camp, series) in this document (largest plausible).
+      - If nothing found at all and ENABLE_GENERIC_FALLBACK, try strict generic parsing.
     """
     rows = []
     clean = normalize(text)
     category = detect_category(clean)
 
-    # 1) High-confidence pass: known camps only
+    # map (camp, series) -> best value found
+    best = {}
+
     for camp, pat in CAMP_PATS.items():
         for m in pat.finditer(clean):
             start = m.end()
-            window = clean[start:start+96]  # small forward window after label
+            window = clean[start:start+120]  # forward window
             if not window.strip():
                 continue
-            # Drop if this window screams "total"
+
+            # skip obvious totals near the label
             if re.search(r"\b(total|grand total)\b", window, re.I):
                 continue
-            # Collect plausible numbers
-            candidates = extract_numbers_in_window(window)
+
+            # HH hint -> extend window a bit to search for population instead
+            win2 = window
+            if is_household_hint(window):
+                win2 = clean[start:start+200]
+
+            # collect candidates with absolute positions
+            candidates = list(extract_number_tokens(win2, base_offset=start))
             if not candidates:
                 continue
-            # Avoid household counts if we can detect them
-            if is_household_hint(window):
-                # If HH hinted, maybe next window contains pop; peek a bit further
-                window2 = clean[start:start+160]
-                c2 = extract_numbers_in_window(window2)
-                if c2:
-                    candidates = c2
-            # Pick the largest plausible value near the camp (often the population)
-            val = max(candidates) if candidates else None
-            if val is None:
-                continue
 
-            # Per-camp sanity check
+            # tag series for each candidate and keep plausible by camp bounds
             mn, mx = CAMP_BOUNDS.get(camp, (GLOBAL_MIN, GLOBAL_MAX))
-            if not (mn <= val <= mx):
-                # Value outside camp bounds — drop as likely noise
-                continue
+            for c in candidates:
+                val = c["val"]
+                if not (mn <= val <= mx):
+                    continue
+                # detect series near the numeric token
+                series = detect_series_near(clean, c["start"])
+                key = (camp, series)
+                prev = best.get(key)
+                if (prev is None) or (val > prev["population"]):
+                    best[key] = {
+                        "camp_name": camp,
+                        "population": int(val),
+                        "category": category,
+                        "series": series,
+                        "parse_notes": "camp_window",
+                        "parse_confidence": 0.95 if series in ("tbc","tbbc","unhcr") else 0.9,
+                    }
+            # proceed to next camp occurrence after first useful window
+            # (comment this 'break' if a map repeats labels multiple times and you want to scan all)
+            break
 
-            rows.append({
-                "camp_name": camp,
-                "population": int(val),
-                "category": category,
-                "parse_notes": "camp_window_peak",
-                "parse_confidence": 0.95
-            })
-            break  # stop after first valid capture for this camp
-
-    # 2) Fallback pass (generic "Label 12345"), very strict to avoid noise
-    #    Only run if we found nothing at all (e.g., IDP maps or unknown labels)
-    if False and not rows:
+    # Optional generic fallback (kept OFF by default to avoid noise)
+    if ENABLE_GENERIC_FALLBACK and not best:
         seen = set()
         for m in re.finditer(r"([A-Z][A-Za-z /'\-]{2,40})\s+([0-9][0-9,\.\s]{2,})", clean):
             raw_label = m.group(1).strip()
-            digits = re.sub(r"[^\d]", "", m.group(2))
+            token = m.group(2).strip()
+            digits = re.sub(r"[^\d]", "", token)
             if not digits.isdigit():
                 continue
             val = int(digits)
-
-            # reject obvious non-population numbers
-            if 1900 <= val <= 2200:
+            # reject plain-4-digit years
+            if re.fullmatch(r"\d{4}", token) and 1900 <= val <= 2100:
                 continue
             if not (GLOBAL_MIN <= val <= GLOBAL_MAX):
                 continue
-
-            # normalize label; drop month words & stopwords
+            # normalize label; drop month/stopwords
             norm = re.sub(r"[^a-z]", " ", raw_label.lower()).strip()
-            key = re.sub(r"\s+", " ", norm)
-            if key in MONTH_WORDS or key in LABEL_STOPWORDS:
+            key_norm = re.sub(r"\s+", " ", norm)
+            if key_norm in MONTH_WORDS or key_norm in LABEL_STOPWORDS:
                 continue
-
-            # map to canonical camp if alias known; otherwise keep raw
-            label = ALIASES.get(key, raw_label)
+            label = ALIASES.get(key_norm, raw_label)
             if label in seen:
                 continue
             seen.add(label)
-
-            # If this accidentally matches a known camp, also check camp bounds
+            # series near the token
+            series = detect_series_near(clean, m.start(2))
+            # apply camp bounds if known
             if label in CAMP_BOUNDS:
-                mn, mx = CAMP_BOUNDS[label]
-                if not (mn <= val <= mx):
+                lo, hi = CAMP_BOUNDS[label]
+                if not (lo <= val <= hi):
                     continue
-
-            rows.append({
+            best[(label, series)] = {
                 "camp_name": label,
                 "population": int(val),
                 "category": category,
+                "series": series,
                 "parse_notes": "generic_label_number",
-                "parse_confidence": 0.6 if label in CAMP_BOUNDS else 0.5
-            })
+                "parse_confidence": 0.6 if label in CAMP_BOUNDS else 0.5,
+            }
 
-    # Deduplicate by camp_name within this document (keep highest population seen)
-    if rows:
-        best = {}
-        for r in rows:
-            name = r["camp_name"]
-            if name not in best or (r.get("population") or 0) > (best[name].get("population") or 0):
-                best[name] = r
-        rows = list(best.values())
-
+    rows = list(best.values())
     return rows
 
 # --- Main pipeline ---
@@ -374,13 +389,12 @@ def main():
     if df_idx.empty:
         print("[warn] sources_index.csv has 0 rows", flush=True)
         pd.DataFrame(columns=[
-            "report_date","camp_name","population","category",
+            "report_date","camp_name","population","category","series",
             "source_url","file_name","extract_method","parse_notes","parse_confidence"
         ]).to_csv(OUT_LONG, index=False)
         pd.DataFrame().to_csv(OUT_WIDE, index=False)
         return
 
-    # Parse/normalize dates
     with pd.option_context("mode.use_inf_as_na", True):
         df_idx["report_date"] = pd.to_datetime(df_idx["report_date"], errors="coerce")
 
@@ -391,7 +405,7 @@ def main():
         except Exception as e:
             print(f"[warn] bad EXTRACT_SINCE={EXTRACT_SINCE}: {e}", flush=True)
 
-    # Resume: skip files we've already extracted
+    # Resume: skip files already in LONG
     existing = pd.DataFrame()
     processed_keys = set()
     if RESUME_MODE and OUT_LONG.exists() and OUT_LONG.stat().st_size:
@@ -404,14 +418,13 @@ def main():
         except Exception as e:
             print(f"[warn] could not read existing LONG CSV: {e}", flush=True)
 
-    # Order
+    # Order & limit
     df_idx = df_idx.dropna(subset=["source_url"])
     if PROCESS_ORDER == "oldest":
         df_idx = df_idx.sort_values(["report_date", "file_name"], na_position="last")
     else:
         df_idx = df_idx.sort_values(["report_date", "file_name"], na_position="last", ascending=[False, True])
 
-    # Limit per run
     candidates = []
     for _, r in df_idx.iterrows():
         key = (str(r.get("source_url","")), str(r.get("file_name","")))
@@ -433,7 +446,6 @@ def main():
         url         = (r.get("source_url") or "").strip()
         fname       = (r.get("file_name")  or "").strip()
         rd_str      = report_date.strftime("%Y-%m-01") if pd.notna(report_date) else ""
-
         if not url:
             continue
 
@@ -456,6 +468,7 @@ def main():
         if not (text or "").strip():
             new_records.append({
                 "report_date": rd_str, "camp_name": None, "population": None, "category": None,
+                "series": "unknown",
                 "source_url": url, "file_name": local.name, "extract_method": method or "none",
                 "parse_notes": "no_text_extracted", "parse_confidence": 0.0
             })
@@ -465,6 +478,7 @@ def main():
         if not rows:
             rows = [{
                 "camp_name": None, "population": None, "category": None,
+                "series": "unknown",
                 "parse_notes": "no_rows_parsed", "parse_confidence": 0.0
             }]
 
@@ -479,7 +493,7 @@ def main():
 
         time.sleep(0.1)  # be polite
 
-    # Combine with existing & write
+    # Combine with existing & write LONG
     df_new = pd.DataFrame.from_records(new_records)
     if existing is not None and not existing.empty:
         combined = pd.concat([existing, df_new], ignore_index=True)
@@ -489,24 +503,26 @@ def main():
     if not combined.empty:
         with pd.option_context("mode.use_inf_as_na", True):
             combined["report_date"] = pd.to_datetime(combined["report_date"], errors="coerce")
-        # Drop exact duplicates
+        # Drop exact duplicates (include series in key!)
         combined = (combined
-                    .drop_duplicates(subset=["report_date","camp_name","source_url","file_name","extract_method","parse_notes"],
-                                     keep="last")
-                    .sort_values(["report_date","camp_name"], na_position="last"))
+                    .drop_duplicates(
+                        subset=["report_date","camp_name","series","source_url","file_name","extract_method","parse_notes"],
+                        keep="last")
+                    .sort_values(["report_date","camp_name","series"], na_position="last"))
         combined["report_date"] = combined["report_date"].dt.strftime("%Y-%m-01").fillna("")
 
     OUT_LONG.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(OUT_LONG, index=False)
 
-    # Wide pivot (robust numeric handling)
+    # Build preferred-series WIDE for README
     try:
         if not combined.empty:
             tmp = combined.dropna(subset=["camp_name","population"]).copy()
             tmp["population"] = pd.to_numeric(tmp["population"], errors="coerce")
-            # Keep only plausible values
+            # Keep plausible values
             tmp = tmp[tmp["population"].between(GLOBAL_MIN, GLOBAL_MAX)]
-            # If camp has bounds, enforce them
+
+            # Enforce camp bounds where known
             def within_bounds(row):
                 camp = str(row["camp_name"])
                 val  = row["population"]
@@ -515,13 +531,27 @@ def main():
                     return lo <= val <= hi
                 return True
             tmp = tmp[tmp.apply(within_bounds, axis=1)]
-            tmp["population"] = tmp["population"].astype("Int64")
 
+            # Choose preferred series per (report_date, camp)
+            tmp["series"] = tmp["series"].fillna("unknown").str.lower()
+            tmp["series_rank"] = tmp["series"].map({s:i for i,s in enumerate(SERIES_PREF)}).fillna(len(SERIES_PREF)).astype(int)
+
+            with pd.option_context("mode.use_inf_as_na", True):
+                tmp["report_date"] = pd.to_datetime(tmp["report_date"], errors="coerce")
+
+            # Sort so the first row is the preferred series, then keep the last population (largest) within that series
+            tmp = (tmp
+                   .sort_values(["report_date","camp_name","series_rank","population"], ascending=[True, True, True, False])
+                   .drop_duplicates(["report_date","camp_name"], keep="first"))
+
+            # Pivot to wide (camps as columns)
             wide = (tmp
-                    .sort_values(["report_date"])
-                    .drop_duplicates(["report_date","camp_name"], keep="last")
                     .pivot(index="report_date", columns="camp_name", values="population")
                     .sort_index())
+            # Nullable ints -> plain Int64
+            for c in wide.columns:
+                wide[c] = pd.to_numeric(wide[c], errors="coerce").astype("Int64")
+            # write
             wide.to_csv(OUT_WIDE)
         else:
             pd.DataFrame().to_csv(OUT_WIDE, index=False)
