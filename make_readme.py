@@ -22,7 +22,7 @@ def load_wide():
 def year_end_wide(df: pd.DataFrame) -> pd.DataFrame:
     """
     For each year, forward-fill within the year and take the last available month per camp.
-    Returns a DataFrame with years as index and camps as columns.
+    Returns years as index and camps as columns.
     """
     if df.empty:
         return df
@@ -36,17 +36,16 @@ def year_end_wide(df: pd.DataFrame) -> pd.DataFrame:
             last.index = [y]  # year as index
             parts.append(last)
     out = pd.concat(parts) if parts else pd.DataFrame()
-    # clean to integers (nullable)
+    # clean to nullable integers
     for c in out.columns:
         out[c] = pd.to_numeric(out[c], errors="coerce").round().astype("Int64")
     return out.sort_index()  # years ascending
 
 def fmt_table_camps_rows(df_year: pd.DataFrame) -> str:
-    """Transpose so camps are rows, format integers with thousands separators, blank for NA."""
+    """Transpose so camps are rows, years are columns; format with thousands separators."""
     if df_year.empty:
         return "_No data available yet._"
     tbl = df_year.T  # camps -> rows, years -> columns
-    # sort camps alphabetically for readability (optional)
     tbl = tbl.sort_index()
     tbl.index.name = "Camp"
     tbl.columns.name = None
@@ -55,7 +54,8 @@ def fmt_table_camps_rows(df_year: pd.DataFrame) -> str:
             return f"{int(x):,}"
         except Exception:
             return ""
-    tbl = tbl.applymap(fmt)
+    # avoid FutureWarning: use .apply(col.map(...)) instead of .applymap
+    tbl = tbl.apply(lambda s: s.map(fmt))
     return tbl.to_markdown()
 
 def main():
