@@ -1,32 +1,19 @@
 #!/usr/bin/env python3
 """
-Step 2: Download each source in data/derived/sources_index.csv and extract per-camp populations.
+tbc_extract.py — column-aware, line-locked extractor with series tagging.
 
-New in this version:
-- Detects and tags series: series ∈ {"tbc", "tbbc", "unhcr", "unknown"}
-- Emits up to one row per (report_date, camp, series) per document
-- README/primary wide table picks a single value per (report_date, camp) by preference:
-  tbc/tbbc > unhcr > unknown
+Key improvements:
+- Same-line parsing: attach numbers only from the same OCR line as the camp label
+  (or the immediate next line if the label wraps).
+- Column selection: detect header line and read numbers from the TBC Assisted or
+  MOI/UNHCR Verified 'Population' column. Preference: tbc/tbbc > unhcr > unknown.
+- Emits up to one row per (report_date, camp, series) per document.
+- Builds preferred-series wide table for README.
 
-Other features kept:
-- High-confidence parsing: only numbers within a short window AFTER each known camp label
-- Reject months, totals, obvious 4-digit years, HH (household) counts
-- Global and per-camp plausibility ranges
-- Resume + cache: skips already-processed files; reuses data/raw/ downloads
-- Robust wide pivot using nullable integers
-
-Outputs:
-  - data/derived/tbc_camp_population_long.csv     (with 'series' column)
-  - data/derived/tbc_camp_population_wide.csv     (preferred series per camp/date)
-  * (Optionally add per-series wides later if desired)
-
-Env knobs (set in workflow):
-  - TBC_VERIFY_SSL: "true"|"false"   (default false; strict TLS if true)
-  - EXTRACT_SINCE: "YYYY-MM-DD"      (filter index to this date or newer; blank = all)
-  - EXTRACT_MAX_FILES: int           (max source files to process this run; default 250)
-  - PROCESS_ORDER: "newest"|"oldest" (which end to process first; default newest)
-  - RESUME_MODE: "true"|"false"      (skip files already present in LONG CSV; default true)
-  - OCR_DPI: int                     (DPI for PDF->image OCR; default 200)
+Inputs via env (set in workflow):
+  TBC_VERIFY_SSL ("true"/"false"), EXTRACT_SINCE (YYYY-MM-DD), EXTRACT_MAX_FILES,
+  PROCESS_ORDER ("newest"|"oldest"), RESUME_MODE ("true"/"false"), OCR_DPI (int),
+  OCR_PSM (int, default 6)
 """
 
 import os, io, re, sys, time, logging
@@ -36,31 +23,29 @@ import pandas as pd
 import requests
 import urllib3
 
-# Verbose but suppress TLS chatter; quiet pdfminer noise
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
 logging.getLogger("pdfplumber").setLevel(logging.ERROR)
 
-# --- Paths ---
 RAW_DIR      = Path("data/raw")
 DERIVED_DIR  = Path("data/derived")
 INDEX_CSV    = DERIVED_DIR / "sources_index.csv"
 OUT_LONG     = DERIVED_DIR / "tbc_camp_population_long.csv"
 OUT_WIDE     = DERIVED_DIR / "tbc_camp_population_wide.csv"
 
-# --- Env ---
 EXTRACT_SINCE     = os.getenv("EXTRACT_SINCE", "").strip()
 EXTRACT_MAX_FILES = int(os.getenv("EXTRACT_MAX_FILES", "250"))
 PROCESS_ORDER     = os.getenv("PROCESS_ORDER", "newest").lower()
 RESUME_MODE       = os.getenv("RESUME_MODE", "true").lower() == "true"
 OCR_DPI           = int(os.getenv("OCR_DPI", "200"))
+OCR_PSM           = int(os.getenv("OCR_PSM", "6"))  # line-by-line
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/2.0; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/3.0; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# --- Camps & aliases ---
+# Camps & aliases (loose-robust)
 KNOWN_CAMPS = [
     "Ban Mai Nai Soi","Ban Mae Surin","Mae La Oon","Mae Ra Ma Luang",
     "Mae La","Umpiem Mai","Nupo","Ban Don Yang","Tham Hin"
@@ -87,16 +72,9 @@ MONTH_WORDS = {
     "jun","june","jul","july","aug","august","sep","sept","september",
     "oct","october","nov","november","dec","december"
 }
-LABEL_STOPWORDS = {
-    "map","unhcr","update","tbc","tbbc","total","grand total","province",
-    "thai myanmar border","myanmar thailand border","thailand myanmar border"
-}
 
-# Global plausible range
 GLOBAL_MIN = 50
 GLOBAL_MAX = 300_000
-
-# Per-camp plausible ranges (broad, for sanity)
 CAMP_BOUNDS = {
     "Mae La":          (10_000,  70_000),
     "Umpiem Mai":      (3_000,   45_000),
@@ -109,34 +87,16 @@ CAMP_BOUNDS = {
     "Tham Hin":        (1_000,   25_000),
 }
 
-# Toggle generic fallback parser (kept OFF to avoid "June / 2025" noise)
-ENABLE_GENERIC_FALLBACK = False
-
-# --- Series detection ---
 SERIES_TOKENS = {
-    "unhcr":  [r"\bUNHCR\b", r"\bUN\s*HCR\b", r"\bU\.?N\.?H\.?C\.?R\b"],
-    "tbbc":   [r"\bTBBC\b", r"\bT\.?B\.?B\.?C\b"],
-    "tbc":    [r"\bTBC\b", r"\bThe\s+Border\s+Consortium\b"],
+    "unhcr":  [r"\bUNHCR\b", r"\bMOI\b", r"Verified\s*['\"]?Population['\"]?"],
+    "tbbc":   [r"\bTBBC\b"],
+    "tbc":    [r"\bTBC\b", r"The\s+Border\s+Consortium"],
 }
 SERIES_PREF = ["tbc", "tbbc", "unhcr", "unknown"]
 
-def detect_series_near(text: str, center_pos: int, radius: int = 120) -> str:
-    """Look around center_pos for series tokens; return most specific match."""
-    lo = max(0, center_pos - radius)
-    hi = min(len(text), center_pos + radius)
-    around = text[lo:hi]
-    found = []
-    for series, patterns in SERIES_TOKENS.items():
-        for pat in patterns:
-            if re.search(pat, around, flags=re.IGNORECASE):
-                found.append(series)
-                break
-    if "tbbc" in found:    return "tbbc"
-    if "tbc" in found:     return "tbc"
-    if "unhcr" in found:   return "unhcr"
-    return "unknown"
+ENABLE_GENERIC_FALLBACK = False  # keep noise off
 
-# --- HTTP helpers ---
+# --- HTTP ---
 def get(url):
     verify_pref = os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"
     try:
@@ -172,7 +132,7 @@ def download(url, report_date):
     out.write_bytes(data)
     return out
 
-# --- Text extraction (PDF / image OCR) ---
+# --- OCR/text ---
 def extract_text_from_pdf(pdf_path):
     txt_all = []
     method = "pdf-text"
@@ -180,7 +140,7 @@ def extract_text_from_pdf(pdf_path):
         import pdfplumber
         with pdfplumber.open(pdf_path) as pdf:
             for page in pdf.pages:
-                t = page.extract_text() or ""
+                t = page.extract_text(x_tolerance=2, y_tolerance=2) or ""
                 if t.strip():
                     txt_all.append(t)
         combined = "\n".join(txt_all)
@@ -203,7 +163,8 @@ def extract_text_from_pdf(pdf_path):
             img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("L")
             img = ImageOps.autocontrast(img)
             img = img.filter(ImageFilter.SHARPEN)
-            parts.append(pytesseract.image_to_string(img))
+            cfg = f"--psm {OCR_PSM} -l eng"
+            parts.append(pytesseract.image_to_string(img, config=cfg))
         return "\n".join(parts), method
     except Exception as e:
         print(f"[warn] pdf OCR failed on {pdf_path.name}: {e}", flush=True)
@@ -216,7 +177,8 @@ def extract_text_from_image(img_path):
         img = Image.open(img_path).convert("L")
         img = ImageOps.autocontrast(img)
         img = img.filter(ImageFilter.SHARPEN)
-        txt = pytesseract.image_to_string(img)
+        cfg = f"--psm {OCR_PSM} -l eng"
+        txt = pytesseract.image_to_string(img, config=cfg)
         return txt, "img-ocr"
     except Exception as e:
         print(f"[warn] image OCR failed on {img_path.name}: {e}", flush=True)
@@ -242,144 +204,169 @@ def build_camp_patterns():
 
 CAMP_PATS = build_camp_patterns()
 
-def is_household_hint(around: str) -> bool:
-    return bool(re.search(r"\bHH\b|\bhouseholds?\b|\bhh:?\b", around, re.I))
-
-def extract_number_tokens(text_slice: str, base_offset: int):
-    """
-    Yield dicts with numeric candidates found in text_slice:
-      {"val": int, "token": str, "start": abs_start, "end": abs_end}
-    - Accept thousand separators , . or spaces; strip to digits.
-    - Reject "plain 4-digit years" 1900..2100 (token must be exactly 4 digits).
-    - Enforce global min/max.
-    """
-    for m in re.finditer(r"([0-9][0-9,\.\s]{1,12})", text_slice):
-        token = m.group(1).strip()
+def num_candidates(s):
+    for m in re.finditer(r"[0-9][0-9,\.\s]{1,12}", s):
+        token = m.group(0).strip()
         digits = re.sub(r"[^\d]", "", token)
-        if not digits or not digits.isdigit():
+        if not digits:
             continue
         val = int(digits)
-        # treat as year only if token is exactly 4 digits (no separators)
-        is_plain_4digit = re.fullmatch(r"\d{4}", token) is not None
-        if is_plain_4digit and 1900 <= val <= 2100:
+        # Reject plain 4-digit years (only exactly 4 digits, no separators)
+        if re.fullmatch(r"\d{4}", token) and 1900 <= val <= 2100:
             continue
         if not (GLOBAL_MIN <= val <= GLOBAL_MAX):
             continue
-        yield {
-            "val": val,
-            "token": token,
-            "start": base_offset + m.start(),
-            "end": base_offset + m.end(),
-        }
+        yield val
 
-# --- Parsing core ---
+def detect_series_by_header(header_line, col_start, col_end):
+    seg = header_line[col_start:col_end].lower()
+    if "tbbc" in seg:
+        return "tbbc"
+    if "tbc" in seg:
+        return "tbc"
+    if "unhcr" in seg or "moi" in seg:
+        return "unhcr"
+    return "unknown"
+
+def find_header_and_columns(lines):
+    """
+    Find a header line containing both TBC/TBBC Assisted and UNHCR/MOI columns.
+    Return (header_index, [(start,end,label_series), ...]) where columns are
+    ordered left->right and limited to the two population columns we care about.
+    """
+    for i, line in enumerate(lines[:60]):  # header near top
+        l = line.lower()
+        if ("assisted" in l or "tbc" in l or "tbbc" in l) and ("unhcr" in l or "moi" in l or "verified" in l):
+            # crude column boundaries: split by 2+ spaces and measure cumulative positions
+            # keep wide segments to approximate columns
+            cuts = []
+            pos = 0
+            # preserve positions by scanning characters
+            segments = re.split(r"( {2,}|\t+)", line)  # keep big gaps
+            cursor = 0
+            # Extract start positions of tokens that look like column headers
+            col_spans = []
+            for m in re.finditer(r"(TBC.*?Assisted.*?|TBBC.*?Assisted.*?|UNHCR.*?Verified.*?|MOI.*?Verified.*?)", line, re.I):
+                start, end = m.start(), m.end()
+                col_spans.append((start, end))
+            # If we got at least one, expand to cover until next header or end
+            if col_spans:
+                col_spans.sort()
+                expanded = []
+                for idx, (s, e) in enumerate(col_spans):
+                    e2 = col_spans[idx+1][0] if idx+1 < len(col_spans) else len(line)
+                    expanded.append((s, e2))
+                # map spans to series labels
+                cols = []
+                for s, e in expanded:
+                    series = detect_series_by_header(line, s, e)
+                    if series in ("tbc","tbbc","unhcr"):
+                        cols.append((s, e, series))
+                # sort left->right
+                cols.sort(key=lambda x: x[0])
+                # keep unique by series (prefer leftmost occurrence)
+                seen = set()
+                uniq = []
+                for s, e, ser in cols:
+                    if ser not in seen:
+                        uniq.append((s, e, ser))
+                        seen.add(ser)
+                return i, uniq
+    return None, []
+
+def slice_by_cols(line, cols):
+    """Yield (series, slice_text) pairs for each col on this line."""
+    out = []
+    for s, e, ser in cols:
+        start = max(0, s - 2)  # small slack
+        end = min(len(line), e + 2)
+        out.append((ser, line[start:end]))
+    return out
+
+def same_or_next_line(lines, i):
+    """Return [line_i, line_{i+1} or ""] for wrap handling."""
+    line = lines[i]
+    nxt = lines[i+1] if i+1 < len(lines) else ""
+    return [line, nxt]
+
 def parse_rows(text):
     """
-    Return list of rows (dicts):
-      report_date (filled later), camp_name, population, category, series,
-      parse_notes, parse_confidence
-    Strategy:
-      - For each known camp, find label positions and look forward in a small window.
-      - For each candidate number, detect 'series' from nearby tokens.
-      - Enforce camp-specific plausible ranges; drop HH/total windows.
-      - Keep at most one row per (camp, series) in this document (largest plausible).
-      - If nothing found at all and ENABLE_GENERIC_FALLBACK, try strict generic parsing.
+    Column-aware, line-locked parsing:
+      - Find header + column positions.
+      - For each line that contains a camp label, read numbers from each population column slice
+        on that same line; if none, also check the next line (wrap).
+      - Enforce camp bounds and build (camp, series) rows.
     """
     rows = []
     clean = normalize(text)
     category = detect_category(clean)
+    lines = [ln.rstrip("\n") for ln in clean.splitlines() if ln.strip()]
 
-    # map (camp, series) -> best value found
-    best = {}
+    header_idx, cols = find_header_and_columns(lines)
+    best = {}  # (camp, series) -> value
 
-    for camp, pat in CAMP_PATS.items():
-        for m in pat.finditer(clean):
-            start = m.end()
-            window = clean[start:start+120]  # forward window
-            if not window.strip():
+    # Build regex for camp detection on a line (case-insensitive)
+    camp_regexes = {camp: re.compile(rf"(?i)\b{r'[ _\-]*'.join(map(re.escape, camp.split()))}\b") for camp in KNOWN_CAMPS}
+
+    for i, line in enumerate(lines):
+        for camp, cre in camp_regexes.items():
+            if not cre.search(line):
                 continue
 
-            # skip obvious totals near the label
-            if re.search(r"\b(total|grand total)\b", window, re.I):
-                continue
+            # Check same line, then the next for wrapped numbers
+            for candidate_line in same_or_next_line(lines, i):
+                # If we have header columns, use them to slice; else read numbers to the right of camp token
+                found_vals = []
+                if cols:
+                    # Use column slices
+                    for ser, seg in [(ser, seg) for ser, seg in slice_by_cols(candidate_line, cols)]:
+                        for val in num_candidates(seg):
+                            found_vals.append((ser, val))
+                else:
+                    # No header found — fall back to "to-the-right on same line"
+                    # Take substring after the camp occurrence on this line
+                    m = cre.search(candidate_line)
+                    if m:
+                        right = candidate_line[m.end():]
+                        for val in num_candidates(right[:80]):  # small right window
+                            # series guess near token (line has no header)
+                            ser = "unknown"
+                            if re.search(r"\bTBC\b|\bTBBC\b", right, re.I): ser = "tbc"
+                            if re.search(r"\bUNHCR\b|\bMOI\b", right, re.I): ser = "unhcr"
+                            found_vals.append((ser, val))
 
-            # HH hint -> extend window a bit to search for population instead
-            win2 = window
-            if is_household_hint(window):
-                win2 = clean[start:start+200]
-
-            # collect candidates with absolute positions
-            candidates = list(extract_number_tokens(win2, base_offset=start))
-            if not candidates:
-                continue
-
-            # tag series for each candidate and keep plausible by camp bounds
-            mn, mx = CAMP_BOUNDS.get(camp, (GLOBAL_MIN, GLOBAL_MAX))
-            for c in candidates:
-                val = c["val"]
-                if not (mn <= val <= mx):
+                if not found_vals:
                     continue
-                # detect series near the numeric token
-                series = detect_series_near(clean, c["start"])
-                key = (camp, series)
-                prev = best.get(key)
-                if (prev is None) or (val > prev["population"]):
-                    best[key] = {
-                        "camp_name": camp,
-                        "population": int(val),
-                        "category": category,
-                        "series": series,
-                        "parse_notes": "camp_window",
-                        "parse_confidence": 0.95 if series in ("tbc","tbbc","unhcr") else 0.9,
-                    }
-            # proceed to next camp occurrence after first useful window
-            # (comment this 'break' if a map repeats labels multiple times and you want to scan all)
-            break
 
-    # Optional generic fallback (kept OFF by default to avoid noise)
-    if ENABLE_GENERIC_FALLBACK and not best:
-        seen = set()
-        for m in re.finditer(r"([A-Z][A-Za-z /'\-]{2,40})\s+([0-9][0-9,\.\s]{2,})", clean):
-            raw_label = m.group(1).strip()
-            token = m.group(2).strip()
-            digits = re.sub(r"[^\d]", "", token)
-            if not digits.isdigit():
-                continue
-            val = int(digits)
-            # reject plain-4-digit years
-            if re.fullmatch(r"\d{4}", token) and 1900 <= val <= 2100:
-                continue
-            if not (GLOBAL_MIN <= val <= GLOBAL_MAX):
-                continue
-            # normalize label; drop month/stopwords
-            norm = re.sub(r"[^a-z]", " ", raw_label.lower()).strip()
-            key_norm = re.sub(r"\s+", " ", norm)
-            if key_norm in MONTH_WORDS or key_norm in LABEL_STOPWORDS:
-                continue
-            label = ALIASES.get(key_norm, raw_label)
-            if label in seen:
-                continue
-            seen.add(label)
-            # series near the token
-            series = detect_series_near(clean, m.start(2))
-            # apply camp bounds if known
-            if label in CAMP_BOUNDS:
-                lo, hi = CAMP_BOUNDS[label]
-                if not (lo <= val <= hi):
-                    continue
-            best[(label, series)] = {
-                "camp_name": label,
-                "population": int(val),
-                "category": category,
-                "series": series,
-                "parse_notes": "generic_label_number",
-                "parse_confidence": 0.6 if label in CAMP_BOUNDS else 0.5,
-            }
+                lo, hi = CAMP_BOUNDS.get(camp, (GLOBAL_MIN, GLOBAL_MAX))
+                for ser, val in found_vals:
+                    if not (lo <= val <= hi):
+                        continue
+                    key = (camp, ser)
+                    prev = best.get(key)
+                    if (prev is None) or (val > prev):
+                        best[key] = val
+                # Once we found something for this camp on this (or next) line, move to next camp/line
+                if any((camp == k[0]) for k in best.keys()):
+                    break
 
-    rows = list(best.values())
+    for (camp, ser), val in best.items():
+        rows.append({
+            "camp_name": camp,
+            "population": int(val),
+            "category": category,
+            "series": ser,
+            "parse_notes": "line_locked_column",
+            "parse_confidence": 0.97 if ser in ("tbc","tbbc","unhcr") else 0.9,
+        })
+
+    # Optional generic fallback off by default
+    if not rows and ENABLE_GENERIC_FALLBACK:
+        pass
+
     return rows
 
-# --- Main pipeline ---
+# --- Main pipeline (unchanged structure) ---
 def main():
     if not INDEX_CSV.exists() or INDEX_CSV.stat().st_size == 0:
         print(f"[error] missing or empty {INDEX_CSV}", flush=True)
@@ -405,7 +392,6 @@ def main():
         except Exception as e:
             print(f"[warn] bad EXTRACT_SINCE={EXTRACT_SINCE}: {e}", flush=True)
 
-    # Resume: skip files already in LONG
     existing = pd.DataFrame()
     processed_keys = set()
     if RESUME_MODE and OUT_LONG.exists() and OUT_LONG.stat().st_size:
@@ -418,7 +404,6 @@ def main():
         except Exception as e:
             print(f"[warn] could not read existing LONG CSV: {e}", flush=True)
 
-    # Order & limit
     df_idx = df_idx.dropna(subset=["source_url"])
     if PROCESS_ORDER == "oldest":
         df_idx = df_idx.sort_values(["report_date", "file_name"], na_position="last")
@@ -491,9 +476,8 @@ def main():
             })
             new_records.append(row)
 
-        time.sleep(0.1)  # be polite
+        time.sleep(0.05)  # polite
 
-    # Combine with existing & write LONG
     df_new = pd.DataFrame.from_records(new_records)
     if existing is not None and not existing.empty:
         combined = pd.concat([existing, df_new], ignore_index=True)
@@ -503,7 +487,6 @@ def main():
     if not combined.empty:
         with pd.option_context("mode.use_inf_as_na", True):
             combined["report_date"] = pd.to_datetime(combined["report_date"], errors="coerce")
-        # Drop exact duplicates (include series in key!)
         combined = (combined
                     .drop_duplicates(
                         subset=["report_date","camp_name","series","source_url","file_name","extract_method","parse_notes"],
@@ -514,15 +497,13 @@ def main():
     OUT_LONG.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(OUT_LONG, index=False)
 
-    # Build preferred-series WIDE for README
+    # Preferred-series wide
     try:
         if not combined.empty:
             tmp = combined.dropna(subset=["camp_name","population"]).copy()
             tmp["population"] = pd.to_numeric(tmp["population"], errors="coerce")
-            # Keep plausible values
             tmp = tmp[tmp["population"].between(GLOBAL_MIN, GLOBAL_MAX)]
 
-            # Enforce camp bounds where known
             def within_bounds(row):
                 camp = str(row["camp_name"])
                 val  = row["population"]
@@ -532,26 +513,21 @@ def main():
                 return True
             tmp = tmp[tmp.apply(within_bounds, axis=1)]
 
-            # Choose preferred series per (report_date, camp)
             tmp["series"] = tmp["series"].fillna("unknown").str.lower()
             tmp["series_rank"] = tmp["series"].map({s:i for i,s in enumerate(SERIES_PREF)}).fillna(len(SERIES_PREF)).astype(int)
 
             with pd.option_context("mode.use_inf_as_na", True):
                 tmp["report_date"] = pd.to_datetime(tmp["report_date"], errors="coerce")
 
-            # Sort so the first row is the preferred series, then keep the last population (largest) within that series
             tmp = (tmp
                    .sort_values(["report_date","camp_name","series_rank","population"], ascending=[True, True, True, False])
                    .drop_duplicates(["report_date","camp_name"], keep="first"))
 
-            # Pivot to wide (camps as columns)
             wide = (tmp
                     .pivot(index="report_date", columns="camp_name", values="population")
                     .sort_index())
-            # Nullable ints -> plain Int64
             for c in wide.columns:
                 wide[c] = pd.to_numeric(wide[c], errors="coerce").astype("Int64")
-            # write
             wide.to_csv(OUT_WIDE)
         else:
             pd.DataFrame().to_csv(OUT_WIDE, index=False)
