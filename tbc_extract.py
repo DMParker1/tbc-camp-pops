@@ -1,38 +1,50 @@
 #!/usr/bin/env python3
 """
-Step 2: Download each source in data/derived/sources_index.csv and extract per-camp populations.
+Incremental extractor: downloads sources from data/derived/sources_index.csv,
+parses per-camp populations, and appends only NEW results.
 
 Outputs:
-  - data/derived/tbc_camp_population_long.csv  (long/tidy: one row per camp per month)
-  - data/derived/tbc_camp_population_wide.csv  (pivot convenience)
-  - data/raw/<files>                            (cached artifacts)
+  - data/derived/tbc_camp_population_long.csv
+  - data/derived/tbc_camp_population_wide.csv
+  - data/raw/  (cached across runs via actions/cache)
 
-Heuristics:
-- Try PDF text (pdfplumber) first; if sparse, render to images (PyMuPDF) + OCR (Tesseract).
-- For images (JPG/PNG), OCR directly.
-- Match against the 9 Thai refugee camps; also capture other "Label 12345" pairs to catch IDP camps.
-- Category detection: if text mentions "IDP"/"Internally Displaced" → category=idp; else refugee.
-
-Env knobs (set in workflow step `env:`):
-  - PYTHONUNBUFFERED: "1" (for live logs)
-  - TBC_VERIFY_SSL:   "true"|"false" (controls initial SSL verification; fallback is automatic)
+Env knobs:
+  - TBC_VERIFY_SSL: "true"|"false"   (default false; strict TLS if true)
+  - EXTRACT_SINCE: "YYYY-MM-DD"      (filter index to this date or newer; blank = all)
+  - EXTRACT_MAX_FILES: int           (max source files to process this run; default 250)
+  - PROCESS_ORDER: "newest"|"oldest" (which end to process first; default newest)
+  - RESUME_MODE: "true"|"false"      (skip files already present in LONG CSV; default true)
+  - OCR_DPI: int                     (DPI for PDF->image OCR; default 200)
 """
 
-import os, io, re, sys, time
+import os, io, re, sys, time, logging
 from pathlib import Path
 from urllib.parse import urlparse
+from datetime import datetime
 import pandas as pd
 import requests
+import urllib3
 
-# ---- Config ----
+# Verbose but not noisy about TLS warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
+logging.getLogger("pdfplumber").setLevel(logging.ERROR)
+
+# --- Config & env ---
 RAW_DIR      = Path("data/raw")
 DERIVED_DIR  = Path("data/derived")
 INDEX_CSV    = DERIVED_DIR / "sources_index.csv"
 OUT_LONG     = DERIVED_DIR / "tbc_camp_population_long.csv"
 OUT_WIDE     = DERIVED_DIR / "tbc_camp_population_wide.csv"
 
+EXTRACT_SINCE    = os.getenv("EXTRACT_SINCE", "").strip()
+EXTRACT_MAX_FILES= int(os.getenv("EXTRACT_MAX_FILES", "250"))
+PROCESS_ORDER    = os.getenv("PROCESS_ORDER", "newest").lower()
+RESUME_MODE      = os.getenv("RESUME_MODE", "true").lower() == "true"
+OCR_DPI          = int(os.getenv("OCR_DPI", "200"))
+
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/1.1; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/1.2; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
@@ -40,7 +52,6 @@ KNOWN_CAMPS = [
     "Ban Mai Nai Soi","Ban Mae Surin","Mae La Oon","Mae Ra Ma Luang",
     "Mae La","Umpiem Mai","Nupo","Ban Don Yang","Tham Hin"
 ]
-# Light alias map to help with common OCR quirks
 ALIASES = {
     "ban mainai soi": "Ban Mai Nai Soi",
     "ban mai nai soi": "Ban Mai Nai Soi",
@@ -56,9 +67,8 @@ ALIASES = {
     "tham hin": "Tham Hin",
 }
 
-# --- HTTP helpers (env-aware SSL + fallback) ---
+# --- HTTP (env-aware SSL + fallback) ---
 def get(url):
-    """Requests GET with optional SSL verification (env-controlled) and fallback to verify=False on SSLError."""
     verify_pref = os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"
     try:
         r = requests.get(url, headers=HEADERS, timeout=30, verify=verify_pref)
@@ -83,13 +93,18 @@ def download(url, report_date):
     out = RAW_DIR / safe_filename(url, report_date)
     if out.exists() and out.stat().st_size > 0:
         return out
-    data = get(url).content
+    try:
+        data = get(url).content
+    except requests.exceptions.HTTPError as e:
+        if getattr(e, "response", None) is not None and e.response.status_code == 404:
+            print(f"[info] 404 not found, skipping: {url}", flush=True)
+            return None
+        raise
     out.write_bytes(data)
     return out
 
-# --- Text extraction helpers ---
+# --- Text extraction ---
 def extract_text_from_pdf(pdf_path):
-    """Try pdfplumber text first; if sparse, render to images + OCR."""
     txt_all = []
     method = "pdf-text"
     try:
@@ -100,7 +115,7 @@ def extract_text_from_pdf(pdf_path):
                 if t.strip():
                     txt_all.append(t)
         combined = "\n".join(txt_all)
-        if len(combined.strip()) >= 200:
+        if len(combined.strip()) >= 300:
             return combined, method
         else:
             print(f"[info] {pdf_path.name}: pdf text sparse; falling back to OCR", flush=True)
@@ -115,7 +130,7 @@ def extract_text_from_pdf(pdf_path):
         doc = fitz.open(pdf_path)
         parts = []
         for p in doc:
-            pix = p.get_pixmap(dpi=300)
+            pix = p.get_pixmap(dpi=OCR_DPI)
             img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("L")
             img = ImageOps.autocontrast(img)
             img = img.filter(ImageFilter.SHARPEN)
@@ -140,7 +155,7 @@ def extract_text_from_image(img_path):
 
 def normalize(s):
     s = (s or "").replace("\u00a0", " ")
-    s = re.sub(r"[^\S\r\n]+", " ", s)  # collapse whitespace (not newlines)
+    s = re.sub(r"[^\S\r\n]+", " ", s)
     return s
 
 def detect_category(text):
@@ -150,15 +165,11 @@ def detect_category(text):
 
 # --- Parsing ---
 def parse_rows(text):
-    """
-    Return list of dicts:
-      camp_name, population, category, parse_notes, parse_confidence
-    """
     rows = []
     clean = normalize(text)
     category = detect_category(clean)
 
-    # 1) strict matches for known refugee camps
+    # known camps
     for camp in KNOWN_CAMPS:
         camp_pattern = re.sub(r" ", r"[ _-]?", re.escape(camp))
         pat = re.compile(rf"{camp_pattern}[^0-9]{{0,10}}([0-9][0-9,\.\s]{{2,}})", re.I)
@@ -174,7 +185,7 @@ def parse_rows(text):
                     "parse_confidence": 1.0
                 })
 
-    # 2) generic "Label 12345" lines to catch IDP or unlabeled camps
+    # generic fallback
     seen = {r["camp_name"] for r in rows}
     for m in re.finditer(r"([A-Z][A-Za-z /'\-]{2,40})\s+([0-9][0-9,\.\s]{2,})", clean):
         label = m.group(1).strip()
@@ -182,9 +193,9 @@ def parse_rows(text):
         if len(digits) < 3:
             continue
         norm = re.sub(r"[^a-z]", " ", label.lower()).strip()
-        label_key = re.sub(r"\s+", " ", norm)
-        if label_key in ALIASES:
-            label = ALIASES[label_key]
+        key = re.sub(r"\s+", " ", norm)
+        if key in ALIASES:
+            label = ALIASES[key]
         if label in seen:
             continue
         rows.append({
@@ -198,11 +209,11 @@ def parse_rows(text):
 
     return rows
 
-# --- Main pipeline ---
+# --- Main ---
 def main():
     if not INDEX_CSV.exists() or INDEX_CSV.stat().st_size == 0:
         print(f"[error] missing or empty {INDEX_CSV}", flush=True)
-        sys.exit(0)  # graceful exit
+        sys.exit(0)
 
     df_idx = pd.read_csv(INDEX_CSV, dtype=str).fillna("")
     if df_idx.empty:
@@ -214,24 +225,66 @@ def main():
         pd.DataFrame().to_csv(OUT_WIDE, index=False)
         return
 
+    # Parse/normalize dates
+    with pd.option_context("mode.use_inf_as_na", True):
+        df_idx["report_date"] = pd.to_datetime(df_idx["report_date"], errors="coerce")
+    if EXTRACT_SINCE:
+        try:
+            since = pd.to_datetime(EXTRACT_SINCE)
+            df_idx = df_idx[df_idx["report_date"] >= since]
+        except Exception as e:
+            print(f"[warn] bad EXTRACT_SINCE={EXTRACT_SINCE}: {e}", flush=True)
+
+    # Resume: skip files we've already extracted
+    existing = pd.DataFrame()
+    processed_keys = set()
+    if RESUME_MODE and OUT_LONG.exists() and OUT_LONG.stat().st_size:
+        try:
+            existing = pd.read_csv(OUT_LONG, dtype=str).fillna("")
+            if not existing.empty:
+                processed_keys = set(zip(existing.get("source_url", []), existing.get("file_name", [])))
+                # keep report_date sane for later sorting
+                with pd.option_context("mode.use_inf_as_na", True):
+                    existing["report_date"] = pd.to_datetime(existing["report_date"], errors="coerce")
+        except Exception as e:
+            print(f"[warn] could not read existing LONG CSV: {e}", flush=True)
+
+    # Order
+    df_idx = df_idx.dropna(subset=["source_url"])
+    if PROCESS_ORDER == "oldest":
+        df_idx = df_idx.sort_values(["report_date", "file_name"], na_position="last")
+    else:
+        df_idx = df_idx.sort_values(["report_date", "file_name"], na_position="last", ascending=[False, True])
+
+    # Limit per run
+    candidates = []
+    for _, r in df_idx.iterrows():
+        key = (str(r.get("source_url","")), str(r.get("file_name","")))
+        if RESUME_MODE and key in processed_keys:
+            continue
+        candidates.append(r)
+        if len(candidates) >= EXTRACT_MAX_FILES:
+            break
+
+    print(f"[info] extracting from {len(candidates)} new files "
+          f"(resume={RESUME_MODE}, since='{EXTRACT_SINCE or 'ALL'}', order={PROCESS_ORDER})",
+          flush=True)
+
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    records = []
-    for _, row in df_idx.iterrows():
-        report_date = (row.get("report_date") or "").strip()
-        url         = (row.get("source_url")  or "").strip()
-        fname       = (row.get("file_name")   or "").strip()
+    new_records = []
+
+    for r in candidates:
+        report_date = r["report_date"]
+        url         = (r.get("source_url") or "").strip()
+        fname       = (r.get("file_name")  or "").strip()
+        rd_str      = report_date.strftime("%Y-%m-01") if pd.notna(report_date) else ""
+
         if not url:
             continue
 
-        try:
-            local = download(url, report_date)
-        except Exception as e:
-            print(f"[warn] download failed: {url} -> {e}", flush=True)
-            records.append({
-                "report_date": report_date, "camp_name": None, "population": None, "category": None,
-                "source_url": url, "file_name": fname, "extract_method": None,
-                "parse_notes": f"download_error:{e}", "parse_confidence": 0.0
-            })
+        local = download(url, rd_str)
+        if local is None:
+            # 404 etc. — just skip
             continue
 
         ext = local.suffix.lower()
@@ -242,67 +295,48 @@ def main():
             elif ext in (".jpg",".jpeg",".png"):
                 text, method = extract_text_from_image(local)
             else:
-                # fallback to OCR anyway (some files miss extensions)
                 text, method = extract_text_from_image(local)
         except Exception as e:
             print(f"[warn] extraction failed: {local.name} -> {e}", flush=True)
 
-        if not text.strip():
-            records.append({
-                "report_date": report_date, "camp_name": None, "population": None, "category": None,
+        if not (text or "").strip():
+            new_records.append({
+                "report_date": rd_str, "camp_name": None, "population": None, "category": None,
                 "source_url": url, "file_name": local.name, "extract_method": method or "none",
                 "parse_notes": "no_text_extracted", "parse_confidence": 0.0
             })
             continue
 
-        rows = parse_rows(text)
-        if not rows:
-            rows = [{
-                "camp_name": None, "population": None, "category": None,
-                "parse_notes": "no_rows_parsed", "parse_confidence": 0.0
-            }]
+        rows = parse_rows(text) or [{
+            "camp_name": None, "population": None, "category": None,
+            "parse_notes": "no_rows_parsed", "parse_confidence": 0.0
+        }]
 
-        for r in rows:
-            r.update({
-                "report_date": report_date,
+        for row in rows:
+            row.update({
+                "report_date": rd_str,
                 "source_url": url,
                 "file_name": local.name,
                 "extract_method": method or "unknown",
             })
-            records.append(r)
+            new_records.append(row)
 
-        time.sleep(0.25)  # be polite
+        # polite delay
+        time.sleep(0.1)
 
-    # Write outputs
-    df_long = pd.DataFrame.from_records(records)
+    # Combine with existing & write
+    df_new = pd.DataFrame.from_records(new_records)
+    if existing is not None and not existing.empty:
+        combined = pd.concat([existing, df_new], ignore_index=True)
+    else:
+        combined = df_new
 
-    if not df_long.empty:
+    if not combined.empty:
         with pd.option_context("mode.use_inf_as_na", True):
-            df_long["report_date"] = pd.to_datetime(df_long["report_date"], errors="coerce")
-        df_long = df_long.sort_values(["report_date","camp_name"], na_position="last")
-        df_long["report_date"] = df_long["report_date"].dt.strftime("%Y-%m-01").fillna("")
-
-    OUT_LONG.parent.mkdir(parents=True, exist_ok=True)
-    df_long.to_csv(OUT_LONG, index=False)
-
-    # Wide pivot
-    try:
-        if not df_long.empty:
-            tmp = df_long.dropna(subset=["camp_name","population"]).copy()
-            tmp["population"] = tmp["population"].astype(int)
-            wide = (tmp
-                    .sort_values(["report_date"])
-                    .drop_duplicates(["report_date","camp_name"], keep="last")
-                    .pivot(index="report_date", columns="camp_name", values="population")
-                    .sort_index())
-            wide.to_csv(OUT_WIDE)
-        else:
-            pd.DataFrame().to_csv(OUT_WIDE, index=False)
-    except Exception as e:
-        print(f"[warn] could not generate wide CSV: {e}", flush=True)
-        pd.DataFrame().to_csv(OUT_WIDE, index=False)
-
-    print(f"[done] wrote {OUT_LONG} ({len(df_long)} rows)", flush=True)
-
-if __name__ == "__main__":
-    main()
+            combined["report_date"] = pd.to_datetime(combined["report_date"], errors="coerce")
+        # drop exact duplicates
+        combined = (combined
+                    .drop_duplicates(subset=["report_date","camp_name","source_url","file_name","extract_method","parse_notes"],
+                                     keep="last")
+                    .sort_values(["report_date","camp_name"], na_position="last"))
+        combined["report_date"] = combined["report_date"].dt.strftime("%Y-%m-01").f_]()_]()
