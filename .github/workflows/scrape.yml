@@ -1,12 +1,17 @@
 name: scrape-and-index
+
 on:
   schedule:
     - cron: "23 5 7 * *"   # 05:23 UTC on the 7th each month
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,32 +28,42 @@ jobs:
       - name: Crawl + index links (no OCR yet)
         run: python tbc_scraper.py
 
-      - name: Summarize run
+      - name: Summarize run (empty-CSV safe)
         run: |
           python - <<'PY'
           import os, pandas as pd
           from pathlib import Path
+
           p = Path("data/derived/sources_index.csv")
-          if p.exists():
-            df = pd.read_csv(p)
-            rows = len(df)
-            earliest = df['report_date'].min() if 'report_date' in df else 'NA'
-            latest   = df['report_date'].max() if 'report_date' in df else 'NA'
+          rows = 0
+          earliest = latest = 'NA'
+
+          if p.exists() and p.stat().st_size > 0:
+              try:
+                  df = pd.read_csv(p)
+                  rows = len(df)
+                  if rows and "report_date" in df.columns:
+                      earliest = df["report_date"].min()
+                      latest   = df["report_date"].max()
+              except Exception as e:
+                  print(f"[warn] could not read CSV: {e}")
+
+          summ_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summ_path:
+              Path(summ_path).write_text(
+                  f"# Step 1 summary\n"
+                  f"- rows: {rows}\n"
+                  f"- earliest: {earliest}\n"
+                  f"- latest: {latest}\n"
+              )
           else:
-            rows, earliest, latest = 0, 'NA', 'NA'
-          summ = Path(os.environ["GITHUB_STEP_SUMMARY"])
-          summ.write_text(
-            f"# Step 1 summary\n"
-            f"- rows: {rows}\n"
-            f"- earliest: {earliest}\n"
-            f"- latest: {latest}\n"
-          )
+              print(f"rows={rows}, earliest={earliest}, latest={latest}")
           PY
 
       - name: Commit index CSV
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/derived/sources_index.csv README.md
+          git add data/derived/sources_index.csv README.md || true
           git commit -m "update: Step 1 link index" || echo "no changes"
           git push
