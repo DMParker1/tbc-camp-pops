@@ -25,32 +25,41 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Keep CA bundle fresh; scraper/extractor also have SSL fallback
           python -m pip install --upgrade certifi
-          # OCR engine for pytesseract
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
+
+      # Cache downloaded raw files to avoid re-downloading every run
+      - name: Cache raw artifacts
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: raw-cache-${{ runner.os }}-${{ hashFiles('data/derived/sources_index.csv') }}
+          restore-keys: |
+            raw-cache-${{ runner.os }}-
 
       # Step 1 — crawl & index
       - name: Crawl + index links (no OCR yet)
         env:
-          # Let the scraper retry without verification on SSLError
           TBC_VERIFY_SSL: "false"
-          # Go deep (set to "true" for a fast seed-only pass)
           SEED_ONLY: "false"
-          # Crawl breadth and heartbeat
-          MAX_PAGES: "2000"
-          PRINT_EVERY: "25"
-          # Force unbuffered Python for live logs
+          MAX_PAGES: "800"
+          PRINT_EVERY: "10"
+          STOP_AFTER_FOUND: "1500"
           PYTHONUNBUFFERED: "1"
         run: python -u tbc_scraper.py
 
-      # Step 2 — download + extract populations
+      # Step 2 — incremental extract (time-bounded)
       - name: Extract populations (OCR/PDF parsing)
         env:
           PYTHONUNBUFFERED: "1"
-          # Keep extractor in the same SSL mode as scraper
           TBC_VERIFY_SSL: "false"
+          # Process newest subset first; raise these later for backfills
+          EXTRACT_SINCE: "2018-01-01"
+          EXTRACT_MAX_FILES: "250"
+          PROCESS_ORDER: "newest"
+          RESUME_MODE: "true"
+          OCR_DPI: "200"
         run: python -u tbc_extract.py
 
       - name: Summarize run
@@ -97,19 +106,3 @@ jobs:
               df = pd.read_csv(p)
               print("\nLATEST MONTH SAMPLE:")
               df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce")
-              latest = df["report_date"].max()
-              print(df[df["report_date"]==latest].head(15).to_string(index=False))
-          else:
-              print("No extracted rows yet.")
-          PY
-
-      - name: Build README table
-        run: python make_readme.py
-
-      - name: Commit outputs
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/derived/*.csv README.md || true
-          git commit -m "update: extracted camp populations + README" || echo "no changes"
-          git push
