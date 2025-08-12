@@ -25,19 +25,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Keep CA bundle fresh; scraper also has an SSL fallback
           python -m pip install --upgrade certifi
 
       - name: Crawl + index links (no OCR yet)
         env:
-          # Leave false so the scraper will retry without verification on SSLError
+          # Let the scraper retry without verification on SSLError (the site’s chain is flaky)
           TBC_VERIFY_SSL: "false"
-          # Fast mode for initial run (speeds things up). Flip to "false" later.
+          # Fast mode first; flip to "false" later for a deeper crawl
           SEED_ONLY: "true"
-          # Reasonable limits for a quick pass; increase later if needed.
+          # Show progress every page for now
+          PRINT_EVERY: "1"
+          # Limit breadth for a quick test
           MAX_PAGES: "200"
-          PRINT_EVERY: "10"
-        run: python tbc_scraper.py
+          # Force unbuffered stdout so logs stream live
+          PYTHONUNBUFFERED: "1"
+        run: python -u tbc_scraper.py
 
       - name: Summarize run (empty-CSV safe)
         run: |
