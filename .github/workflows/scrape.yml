@@ -4,6 +4,27 @@ on:
   schedule:
     - cron: "23 5 7 * *"   # 05:23 UTC on the 7th each month
   workflow_dispatch:
+    inputs:
+      extract_since:
+        description: "EXTRACT_SINCE (YYYY-MM-DD, blank = all)"
+        required: false
+        default: "2018-01-01"
+      extract_max_files:
+        description: "EXTRACT_MAX_FILES (per run)"
+        required: false
+        default: "250"
+      process_order:
+        description: "PROCESS_ORDER (newest|oldest)"
+        required: false
+        default: "newest"
+      stop_after_found:
+        description: "Crawler STOP_AFTER_FOUND (0 = none)"
+        required: false
+        default: "1500"
+      seed_only:
+        description: "SEED_ONLY (true|false)"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
@@ -29,7 +50,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
 
-      # Cache downloaded raw files to avoid re-downloading every run
       - name: Cache raw artifacts
         uses: actions/cache@v4
         with:
@@ -42,22 +62,21 @@ jobs:
       - name: Crawl + index links (no OCR yet)
         env:
           TBC_VERIFY_SSL: "false"
-          SEED_ONLY: "false"
+          SEED_ONLY: "${{ inputs.seed_only || 'false' }}"
           MAX_PAGES: "800"
           PRINT_EVERY: "10"
-          STOP_AFTER_FOUND: "1500"
+          STOP_AFTER_FOUND: "${{ inputs.stop_after_found || '1500' }}"
           PYTHONUNBUFFERED: "1"
         run: python -u tbc_scraper.py
 
-      # Step 2 — incremental extract (time-bounded)
+      # Step 2 — incremental extract
       - name: Extract populations (OCR/PDF parsing)
         env:
           PYTHONUNBUFFERED: "1"
           TBC_VERIFY_SSL: "false"
-          # Process newest subset first; raise these later for backfills
-          EXTRACT_SINCE: "2018-01-01"
-          EXTRACT_MAX_FILES: "250"
-          PROCESS_ORDER: "newest"
+          EXTRACT_SINCE: "${{ inputs.extract_since || '2018-01-01' }}"
+          EXTRACT_MAX_FILES: "${{ inputs.extract_max_files || '250' }}"
+          PROCESS_ORDER: "${{ inputs.process_order || 'newest' }}"
           RESUME_MODE: "true"
           OCR_DPI: "200"
         run: python -u tbc_extract.py
@@ -106,3 +125,19 @@ jobs:
               df = pd.read_csv(p)
               print("\nLATEST MONTH SAMPLE:")
               df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce")
+              latest = df["report_date"].max()
+              print(df[df["report_date"]==latest].head(15).to_string(index=False))
+          else:
+              print("No extracted rows yet.")
+          PY
+
+      - name: Build README table
+        run: python make_readme.py
+
+      - name: Commit outputs
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/derived/*.csv README.md || true
+          git commit -m "update: scrape/extract + README" || echo "no changes"
+          git push
