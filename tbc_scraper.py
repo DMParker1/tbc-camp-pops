@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
 Step 1: Crawl TBC Camp Population pages and index monthly map files (no OCR/extraction yet).
-Outputs: data/derived/sources_index.csv
+Writes: data/derived/sources_index.csv
+
+Env knobs (set in GitHub Actions step `env:`):
+  - TBC_VERIFY_SSL: "true" | "false"   -> if "false", retry without TLS verification on SSLError (TBC host only)
+  - SEED_ONLY:      "true" | "false"   -> if "true", only parse the seed pages (faster)
+  - MAX_PAGES:      integer            -> crawl breadth cap (default 800)
+  - PRINT_EVERY:    integer            -> print heartbeat every N pages (default 25)
 """
 
 import os
@@ -24,35 +30,43 @@ BASE = "https://www.theborderconsortium.org/"
 START_URLS = [
     # Main index
     "https://www.theborderconsortium.org/resources/key-resources/camp-population/",
-    # Yearly categories (wide net)
+    # Yearly categories (wide net; harmless if a year is missing)
     *[f"https://www.theborderconsortium.org/category/camp-populations-{y}/" for y in range(1990, 2031)],
-    # Site searches that often surface older media/posts (WordPress search)
+    # WordPress site search pages that often surface older media/posts
     "https://www.theborderconsortium.org/?s=camp+population+map",
     "https://www.theborderconsortium.org/?s=camp+populations",
     "https://www.theborderconsortium.org/?s=map",
 ]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Scraper-Index/1.2; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Scraper-Index/1.3; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# --- knobs (can also be set via env in the workflow) ---
-MAX_PAGES    = int(os.getenv("MAX_PAGES", "800"))       # cap crawl breadth
-PRINT_EVERY  = int(os.getenv("PRINT_EVERY", "25"))      # heartbeat frequency (pages)
-SEED_ONLY    = os.getenv("SEED_ONLY", "false").lower() == "true"  # only parse seed pages (faster)
-VERIFY_STRICT= os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"  # strict TLS if "true"
+# --- runtime knobs (can be set via env in the workflow) ---
+MAX_PAGES     = int(os.getenv("MAX_PAGES", "800"))           # crawl breadth cap
+PRINT_EVERY   = int(os.getenv("PRINT_EVERY", "25"))          # heartbeat frequency
+SEED_ONLY     = os.getenv("SEED_ONLY", "false").lower() == "true"
+VERIFY_STRICT = os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"  # strict TLS if "true"
 
-# --- Updated month parser that handles numeric and month-name formats ---
+# --- month parser (numeric + month-name variants, incl. 2-digit years like Aug-95) ---
 MONTHS = {
-    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
-    "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
-    "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
-    "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+    "jan": 1, "january": 1,
+    "feb": 2, "february": 2,
+    "mar": 3, "march": 3,
+    "apr": 4, "april": 4,
+    "may": 5,
+    "jun": 6, "june": 6,
+    "jul": 7, "july": 7,
+    "aug": 8, "august": 8,
+    "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10,
+    "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
 }
 
 def _century_from_two_digit(yy: int) -> int:
-    """Map 90–99 → 1990s; 00–24 → 2000–2024; else 2000+yy."""
+    """Map 90–99 → 1990s; 00–24 → 2000–2024; else 2000+yy (simple future-proof)."""
     if 90 <= yy <= 99:
         return 1900 + yy
     elif 0 <= yy <= 24:
@@ -61,7 +75,14 @@ def _century_from_two_digit(yy: int) -> int:
         return 2000 + yy
 
 def parse_report_date(s: str):
-    """Return (YYYY-MM-01, method) or (None, None)."""
+    """
+    Try to find a (year, month) in a filename or URL segment.
+    Returns (YYYY-MM-01, method) or (None, None).
+    Order:
+      1) 4-digit YYYY and 2-digit MM (1999-09, 1999_09, 1999.09, etc.)
+      2) Month name + 4-digit year OR year + month name
+      3) Month name + 2-digit year (Aug-95, 95 Aug) -> infer century
+    """
     if not s:
         return None, None
     s_clean = s.lower()
@@ -69,7 +90,8 @@ def parse_report_date(s: str):
     # 1) YYYY[-_/.]MM
     m1 = re.search(r"(?P<y>(?:19|20)\d{2})[^0-9]?(?P<m>0[1-9]|1[0-2])", s_clean)
     if m1:
-        y = int(m1.group("y")); mm = int(m1.group("m"))
+        y = int(m1.group("y"))
+        mm = int(m1.group("m"))
         return f"{y:04d}-{mm:02d}-01", "yyyy-mm"
 
     # 2) Month name + 4-digit year OR year + month name
@@ -99,7 +121,7 @@ def parse_report_date(s: str):
 
     return None, None
 
-# Files we care about
+# --- file filters ---
 EXT_OK = (".pdf", ".jpg", ".jpeg", ".png")
 KEYWORDS = ("map", "camp", "population", "unhcr")
 
@@ -111,7 +133,8 @@ def looks_like_map_file(href: str) -> bool:
         return False
     return any(k in href_l for k in KEYWORDS)
 
-def get(url):
+# --- HTTP helpers with SSL fallback ---
+def get(url: str) -> requests.Response:
     """Fetch URL with normal TLS; on SSLError retry with verify=False (TBC host only)."""
     try:
         r = requests.get(url, headers=HEADERS, timeout=20, verify=VERIFY_STRICT)
@@ -119,23 +142,22 @@ def get(url):
         return r
     except SSLError:
         if url.startswith(BASE):
-            print(f"[warn] SSL verify failed for {url}; retrying without verification...", file=sys.stderr)
+            print(f"[warn] SSL verify failed for {url}; retrying without verification...", file=sys.stderr, flush=True)
             r = requests.get(url, headers=HEADERS, timeout=20, verify=False)
             r.raise_for_status()
             return r
         raise
-    except Exception as e:
-        raise
 
-def soup(url):
+def soup(url: str):
     try:
         html = get(url).text
         return BeautifulSoup(html, "lxml")
     except Exception as e:
-        print(f"[warn] fetch failed: {url} -> {e}", file=sys.stderr)
+        print(f"[warn] fetch failed: {url} -> {e}", file=sys.stderr, flush=True)
         return None
 
-def crawl(max_pages=MAX_PAGES):
+# --- crawler ---
+def crawl(max_pages: int = MAX_PAGES) -> pd.DataFrame:
     to_visit = list(dict.fromkeys(START_URLS))  # de-dup seeds
     seen_pages = set()
     found = []  # dicts: report_date, source_url, file_name, origin_page, date_parse_method
@@ -146,8 +168,8 @@ def crawl(max_pages=MAX_PAGES):
             continue
         seen_pages.add(url)
 
-        if len(seen_pages) % PRINT_EVERY == 0:
-            print(f"[progress] visited={len(seen_pages)} queued={len(to_visit)} found={len(found)} now={url}")
+        if PRINT_EVERY and (len(seen_pages) % PRINT_EVERY == 0):
+            print(f"[progress] visited={len(seen_pages)} queued={len(to_visit)} found={len(found)} now={url}", flush=True)
 
         s = soup(url)
         if not s:
@@ -184,27 +206,35 @@ def crawl(max_pages=MAX_PAGES):
 
         time.sleep(0.25)  # be polite
 
-    # DataFrame with schema even if empty
+    # Build DataFrame with schema (even if empty)
     cols = ["report_date", "source_url", "file_name", "origin_page", "date_parse_method"]
     df = pd.DataFrame(found, columns=cols)
 
     if df.empty:
-        return df
+        return df  # zero rows but with headers
 
-    # Dedup + sort
+    # Deduplicate by source_url; prefer entries that have a parsed date
     df = df.sort_values(["source_url", df["report_date"].eq("").astype(int)]).drop_duplicates("source_url", keep="first")
-    with pd.option_context('mode.use_inf_as_na', True):
+
+    # Sort by date then filename
+    with pd.option_context("mode.use_inf_as_na", True):
         df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce")
     df = df.sort_values(["report_date", "file_name"], na_position="last")
     df["report_date"] = df["report_date"].dt.strftime("%Y-%m-01").fillna("")
+
     return df
 
 def main():
+    print(
+        "[start] running tbc_scraper.py "
+        f"(SEED_ONLY={SEED_ONLY} MAX_PAGES={MAX_PAGES} PRINT_EVERY={PRINT_EVERY} VERIFY_STRICT={VERIFY_STRICT})",
+        flush=True,
+    )
     out = Path("data/derived/sources_index.csv")
     out.parent.mkdir(parents=True, exist_ok=True)
     df = crawl()
     df.to_csv(out, index=False)
-    print(f"Wrote {out.resolve()} with {len(df)} rows")
+    print(f"Wrote {out.resolve()} with {len(df)} rows", flush=True)
 
 if __name__ == "__main__":
     main()
