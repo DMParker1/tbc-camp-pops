@@ -339,4 +339,29 @@ def main():
                     .drop_duplicates(subset=["report_date","camp_name","source_url","file_name","extract_method","parse_notes"],
                                      keep="last")
                     .sort_values(["report_date","camp_name"], na_position="last"))
-        combined["report_date"] = combined["report_date"].dt.strftime("%Y-%m-01").f_]()_]()
+        combined["report_date"] = combined["report_date"].dt.strftime("%Y-%m-01").fillna("")
+
+    OUT_LONG.parent.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(OUT_LONG, index=False)
+
+    # Wide
+    try:
+        if not combined.empty:
+            tmp = combined.dropna(subset=["camp_name","population"]).copy()
+            tmp["population"] = tmp["population"].astype(int)
+            wide = (tmp
+                    .sort_values(["report_date"])
+                    .drop_duplicates(["report_date","camp_name"], keep="last")
+                    .pivot(index="report_date", columns="camp_name", values="population")
+                    .sort_index())
+            wide.to_csv(OUT_WIDE)
+        else:
+            pd.DataFrame().to_csv(OUT_WIDE, index=False)
+    except Exception as e:
+        print(f"[warn] could not generate wide CSV: {e}", flush=True)
+        pd.DataFrame().to_csv(OUT_WIDE, index=False)
+
+    print(f"[done] wrote {OUT_LONG} (+{len(df_new)} new rows, total {len(combined)})", flush=True)
+
+if __name__ == "__main__":
+    main()
