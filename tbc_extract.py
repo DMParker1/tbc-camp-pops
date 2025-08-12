@@ -312,7 +312,7 @@ def parse_rows(text):
 
     # 2) Fallback pass (generic "Label 12345"), very strict to avoid noise
     #    Only run if we found nothing at all (e.g., IDP maps or unknown labels)
-    if not rows:
+    if False and not rows:
         seen = set()
         for m in re.finditer(r"([A-Z][A-Za-z /'\-]{2,40})\s+([0-9][0-9,\.\s]{2,})", clean):
             raw_label = m.group(1).strip()
