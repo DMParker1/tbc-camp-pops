@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 """
 Step 2: Download each source in data/derived/sources_index.csv and extract per-camp populations.
+
 Outputs:
   - data/derived/tbc_camp_population_long.csv  (long/tidy: one row per camp per month)
-  - data/derived/tbc_camp_population_wide.csv  (optional convenience pivot)
+  - data/derived/tbc_camp_population_wide.csv  (pivot convenience)
   - data/raw/<files>                            (cached artifacts)
 
 Heuristics:
-- Try PDF text (pdfplumber) first, then render to images (PyMuPDF) + OCR (Tesseract).
+- Try PDF text (pdfplumber) first; if sparse, render to images (PyMuPDF) + OCR (Tesseract).
 - For images (JPG/PNG), OCR directly.
 - Match against the 9 Thai refugee camps; also capture other "Label 12345" pairs to catch IDP camps.
-- Category detection is simple: if the page mentions "IDP" / "Internally Displaced", mark as "idp" else "refugee".
+- Category detection: if text mentions "IDP"/"Internally Displaced" → category=idp; else refugee.
 
-Env knobs (via workflow `env:`):
-  - PYTHONUNBUFFERED: "1" to stream logs
+Env knobs (set in workflow step `env:`):
+  - PYTHONUNBUFFERED: "1" (for live logs)
+  - TBC_VERIFY_SSL:   "true"|"false" (controls initial SSL verification; fallback is automatic)
 """
 
-import os, io, re, sys, hashlib, time
+import os, io, re, sys, time
 from pathlib import Path
 from urllib.parse import urlparse
 import pandas as pd
@@ -30,7 +32,7 @@ OUT_LONG     = DERIVED_DIR / "tbc_camp_population_long.csv"
 OUT_WIDE     = DERIVED_DIR / "tbc_camp_population_wide.csv"
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/1.0; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/1.1; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
@@ -38,7 +40,7 @@ KNOWN_CAMPS = [
     "Ban Mai Nai Soi","Ban Mae Surin","Mae La Oon","Mae Ra Ma Luang",
     "Mae La","Umpiem Mai","Nupo","Ban Don Yang","Tham Hin"
 ]
-# Light alias map to help OCR quirks
+# Light alias map to help with common OCR quirks
 ALIASES = {
     "ban mainai soi": "Ban Mai Nai Soi",
     "ban mai nai soi": "Ban Mai Nai Soi",
@@ -54,32 +56,31 @@ ALIASES = {
     "tham hin": "Tham Hin",
 }
 
-# --- Utilities ---
-def get(url, verify=True):
-    """Requests GET with fallback to verify=False on SSL issues."""
+# --- HTTP helpers (env-aware SSL + fallback) ---
+def get(url):
+    """Requests GET with optional SSL verification (env-controlled) and fallback to verify=False on SSLError."""
+    verify_pref = os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"
     try:
-        r = requests.get(url, headers=HEADERS, timeout=30, verify=verify)
+        r = requests.get(url, headers=HEADERS, timeout=30, verify=verify_pref)
         r.raise_for_status()
         return r
     except requests.exceptions.SSLError:
-        # retry with verify=False for this host only
-        print(f"[warn] SSL verify failed for {url}; retrying without verification...", flush=True)
-        r = requests.get(url, headers=HEADERS, timeout=30, verify=False)
-        r.raise_for_status()
-        return r
+        if url.startswith("https://www.theborderconsortium.org/"):
+            print(f"[warn] SSL verify failed for {url}; retrying without verification...", flush=True)
+            r = requests.get(url, headers=HEADERS, timeout=30, verify=False)
+            r.raise_for_status()
+            return r
+        raise
 
 def safe_filename(url, report_date):
     name = urlparse(url).path.split("/")[-1] or "file"
-    # prefix date if present to reduce collisions
     if report_date:
         name = f"{report_date}_{name}"
-    # sanitize minimally
     return re.sub(r"[^A-Za-z0-9._-]+", "_", name)
 
 def download(url, report_date):
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    fname = safe_filename(url, report_date)
-    out = RAW_DIR / fname
+    out = RAW_DIR / safe_filename(url, report_date)
     if out.exists() and out.stat().st_size > 0:
         return out
     data = get(url).content
@@ -88,7 +89,7 @@ def download(url, report_date):
 
 # --- Text extraction helpers ---
 def extract_text_from_pdf(pdf_path):
-    """Try pdfplumber text first; fallback to render+OCR."""
+    """Try pdfplumber text first; if sparse, render to images + OCR."""
     txt_all = []
     method = "pdf-text"
     try:
@@ -99,7 +100,6 @@ def extract_text_from_pdf(pdf_path):
                 if t.strip():
                     txt_all.append(t)
         combined = "\n".join(txt_all)
-        # if the text is too sparse, fallback to OCR
         if len(combined.strip()) >= 200:
             return combined, method
         else:
@@ -113,14 +113,14 @@ def extract_text_from_pdf(pdf_path):
         import pytesseract
         method = "pdf-ocr"
         doc = fitz.open(pdf_path)
-        pages = []
+        parts = []
         for p in doc:
             pix = p.get_pixmap(dpi=300)
             img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("L")
             img = ImageOps.autocontrast(img)
             img = img.filter(ImageFilter.SHARPEN)
-            pages.append(pytesseract.image_to_string(img))
-        return "\n".join(pages), method
+            parts.append(pytesseract.image_to_string(img))
+        return "\n".join(parts), method
     except Exception as e:
         print(f"[warn] pdf OCR failed on {pdf_path.name}: {e}", flush=True)
         return "", "pdf-fail"
@@ -140,7 +140,7 @@ def extract_text_from_image(img_path):
 
 def normalize(s):
     s = (s or "").replace("\u00a0", " ")
-    s = re.sub(r"[^\S\r\n]+", " ", s)  # collapse whitespace (except newlines)
+    s = re.sub(r"[^\S\r\n]+", " ", s)  # collapse whitespace (not newlines)
     return s
 
 def detect_category(text):
@@ -151,19 +151,16 @@ def detect_category(text):
 # --- Parsing ---
 def parse_rows(text):
     """
-    Return list of dicts with fields:
+    Return list of dicts:
       camp_name, population, category, parse_notes, parse_confidence
     """
     rows = []
     clean = normalize(text)
-
     category = detect_category(clean)
 
-    # 1) Try strict matches for known refugee camps
+    # 1) strict matches for known refugee camps
     for camp in KNOWN_CAMPS:
-        # allow minor OCR noise around spaces/hyphens
         camp_pattern = re.sub(r" ", r"[ _-]?", re.escape(camp))
-        # number can have commas/periods/spaces; don't capture trailing digits from page coords
         pat = re.compile(rf"{camp_pattern}[^0-9]{{0,10}}([0-9][0-9,\.\s]{{2,}})", re.I)
         m = pat.search(clean)
         if m:
@@ -177,16 +174,13 @@ def parse_rows(text):
                     "parse_confidence": 1.0
                 })
 
-    # 2) Generic "Label 12345" lines to catch IDP or unlabeled camps
-    # Avoid duplicate of known camps captured above
+    # 2) generic "Label 12345" lines to catch IDP or unlabeled camps
     seen = {r["camp_name"] for r in rows}
-    # tolerate labels with slashes/hyphens/spaces; keep it moderate to avoid legend text
     for m in re.finditer(r"([A-Z][A-Za-z /'\-]{2,40})\s+([0-9][0-9,\.\s]{2,})", clean):
         label = m.group(1).strip()
         digits = re.sub(r"[^\d]", "", m.group(2))
         if len(digits) < 3:
             continue
-        # Map common OCR alias to known camp (if close)
         norm = re.sub(r"[^a-z]", " ", label.lower()).strip()
         label_key = re.sub(r"\s+", " ", norm)
         if label_key in ALIASES:
@@ -208,12 +202,11 @@ def parse_rows(text):
 def main():
     if not INDEX_CSV.exists() or INDEX_CSV.stat().st_size == 0:
         print(f"[error] missing or empty {INDEX_CSV}", flush=True)
-        sys.exit(0)  # graceful
+        sys.exit(0)  # graceful exit
 
     df_idx = pd.read_csv(INDEX_CSV, dtype=str).fillna("")
     if df_idx.empty:
         print("[warn] sources_index.csv has 0 rows", flush=True)
-        # still write empty outputs with headers
         pd.DataFrame(columns=[
             "report_date","camp_name","population","category",
             "source_url","file_name","extract_method","parse_notes","parse_confidence"
@@ -223,11 +216,10 @@ def main():
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     records = []
-    for i, row in df_idx.iterrows():
+    for _, row in df_idx.iterrows():
         report_date = (row.get("report_date") or "").strip()
         url         = (row.get("source_url")  or "").strip()
         fname       = (row.get("file_name")   or "").strip()
-
         if not url:
             continue
 
@@ -250,7 +242,7 @@ def main():
             elif ext in (".jpg",".jpeg",".png"):
                 text, method = extract_text_from_image(local)
             else:
-                # try OCR anyway (some files lack extension)
+                # fallback to OCR anyway (some files miss extensions)
                 text, method = extract_text_from_image(local)
         except Exception as e:
             print(f"[warn] extraction failed: {local.name} -> {e}", flush=True)
@@ -279,14 +271,12 @@ def main():
             })
             records.append(r)
 
-        # Be a good citizen to the host
-        time.sleep(0.25)
+        time.sleep(0.25)  # be polite
 
     # Write outputs
     df_long = pd.DataFrame.from_records(records)
-    # sort for readability
+
     if not df_long.empty:
-        # Normalize date
         with pd.option_context("mode.use_inf_as_na", True):
             df_long["report_date"] = pd.to_datetime(df_long["report_date"], errors="coerce")
         df_long = df_long.sort_values(["report_date","camp_name"], na_position="last")
@@ -295,7 +285,7 @@ def main():
     OUT_LONG.parent.mkdir(parents=True, exist_ok=True)
     df_long.to_csv(OUT_LONG, index=False)
 
-    # Make a simple wide pivot (latest value per month/camp if duplicates)
+    # Wide pivot
     try:
         if not df_long.empty:
             tmp = df_long.dropna(subset=["camp_name","population"]).copy()
