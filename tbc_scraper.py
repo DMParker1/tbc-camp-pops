@@ -26,19 +26,22 @@ START_URLS = [
     "https://www.theborderconsortium.org/resources/key-resources/camp-population/",
     # Yearly categories (wide net)
     *[f"https://www.theborderconsortium.org/category/camp-populations-{y}/" for y in range(1990, 2031)],
-    # Site searches that often surface older media/posts
+    # Site searches that often surface older media/posts (WordPress search)
     "https://www.theborderconsortium.org/?s=camp+population+map",
     "https://www.theborderconsortium.org/?s=camp+populations",
     "https://www.theborderconsortium.org/?s=map",
 ]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Scraper-Index/1.1; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Scraper-Index/1.2; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# If you want to force strict TLS, set env TBC_VERIFY_SSL=true in the workflow step
-VERIFY_DEFAULT = os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"
+# --- knobs (can also be set via env in the workflow) ---
+MAX_PAGES    = int(os.getenv("MAX_PAGES", "800"))       # cap crawl breadth
+PRINT_EVERY  = int(os.getenv("PRINT_EVERY", "25"))      # heartbeat frequency (pages)
+SEED_ONLY    = os.getenv("SEED_ONLY", "false").lower() == "true"  # only parse seed pages (faster)
+VERIFY_STRICT= os.getenv("TBC_VERIFY_SSL", "false").lower() == "true"  # strict TLS if "true"
 
 # --- Updated month parser that handles numeric and month-name formats ---
 MONTHS = {
@@ -49,7 +52,7 @@ MONTHS = {
 }
 
 def _century_from_two_digit(yy: int) -> int:
-    """Map 90–99 → 1990s; 00–24 → 2000–2024; else 2000+yy (simple future-proof)."""
+    """Map 90–99 → 1990s; 00–24 → 2000–2024; else 2000+yy."""
     if 90 <= yy <= 99:
         return 1900 + yy
     elif 0 <= yy <= 24:
@@ -96,7 +99,7 @@ def parse_report_date(s: str):
 
     return None, None
 
-# File filter: likely monthly map artifacts
+# Files we care about
 EXT_OK = (".pdf", ".jpg", ".jpeg", ".png")
 KEYWORDS = ("map", "camp", "population", "unhcr")
 
@@ -109,29 +112,31 @@ def looks_like_map_file(href: str) -> bool:
     return any(k in href_l for k in KEYWORDS)
 
 def get(url):
-    """Fetch URL with normal TLS; on SSLError retry with verify=False (only for this host)."""
+    """Fetch URL with normal TLS; on SSLError retry with verify=False (TBC host only)."""
     try:
-        r = requests.get(url, headers=HEADERS, timeout=30, verify=VERIFY_DEFAULT)
+        r = requests.get(url, headers=HEADERS, timeout=20, verify=VERIFY_STRICT)
         r.raise_for_status()
         return r
-    except SSLError as e:
-        # Only retry insecurely for the TBC host
+    except SSLError:
         if url.startswith(BASE):
             print(f"[warn] SSL verify failed for {url}; retrying without verification...", file=sys.stderr)
-            r = requests.get(url, headers=HEADERS, timeout=30, verify=False)
+            r = requests.get(url, headers=HEADERS, timeout=20, verify=False)
             r.raise_for_status()
             return r
+        raise
+    except Exception as e:
         raise
 
 def soup(url):
     try:
-        return BeautifulSoup(get(url).text, "lxml")
+        html = get(url).text
+        return BeautifulSoup(html, "lxml")
     except Exception as e:
         print(f"[warn] fetch failed: {url} -> {e}", file=sys.stderr)
         return None
 
-def crawl(max_pages=2000):
-    to_visit = list(dict.fromkeys(START_URLS))  # de-dup while preserving order
+def crawl(max_pages=MAX_PAGES):
+    to_visit = list(dict.fromkeys(START_URLS))  # de-dup seeds
     seen_pages = set()
     found = []  # dicts: report_date, source_url, file_name, origin_page, date_parse_method
 
@@ -140,6 +145,9 @@ def crawl(max_pages=2000):
         if url in seen_pages:
             continue
         seen_pages.add(url)
+
+        if len(seen_pages) % PRINT_EVERY == 0:
+            print(f"[progress] visited={len(seen_pages)} queued={len(to_visit)} found={len(found)} now={url}")
 
         s = soup(url)
         if not s:
@@ -150,14 +158,15 @@ def crawl(max_pages=2000):
             if not href:
                 continue
 
-            # normalize to absolute for same-domain
+            # normalize same-domain relative links
             if href.startswith("/"):
                 href = urljoin(BASE, href)
 
-            # queue more pages on same domain
-            if href.startswith(BASE) and href not in seen_pages and href not in to_visit:
-                if any(seg in href for seg in ("/resources/", "/category/", "/media/", "/wp-content/", "/?s=")):
-                    to_visit.append(href)
+            # optionally enqueue more pages
+            if not SEED_ONLY:
+                if href.startswith(BASE) and href not in seen_pages and href not in to_visit:
+                    if any(seg in href for seg in ("/resources/", "/category/", "/media/", "/wp-content/", "/?s=")):
+                        to_visit.append(href)
 
             # collect candidate files
             if looks_like_map_file(href):
@@ -173,14 +182,14 @@ def crawl(max_pages=2000):
                     "date_parse_method": method or ""
                 })
 
-        time.sleep(0.6)  # be polite
+        time.sleep(0.25)  # be polite
 
-    # Build DataFrame with schema, even if no rows
+    # DataFrame with schema even if empty
     cols = ["report_date", "source_url", "file_name", "origin_page", "date_parse_method"]
     df = pd.DataFrame(found, columns=cols)
 
     if df.empty:
-        return df  # zero rows but with headers
+        return df
 
     # Dedup + sort
     df = df.sort_values(["source_url", df["report_date"].eq("").astype(int)]).drop_duplicates("source_url", keep="first")
