@@ -8,6 +8,5 @@ This step crawls The Border Consortium’s “Camp Population” pages and build
 - `data/derived/sources_index.csv` — columns: `report_date`, `source_url`, `file_name`, `origin_page`, `date_parse_method`
 
 ## How to run
-1. Commit/push these files.
-2. Replace `<YOUR-USER>/<YOUR-REPO>` above with your repo path.
-3. Go to **Actions → scrape-and-index → Run workflow** (or wait for the cron).
+
+Go to **Actions → scrape-and-index → Run workflow** (or wait for the cron).
