@@ -11,7 +11,7 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -26,69 +26,82 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           python -m pip install --upgrade certifi
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
 
+      # Step 1 — crawl & index (you already have this)
       - name: Crawl + index links (no OCR yet)
         env:
-          # Let the scraper retry without verification on SSLError (the site’s chain is flaky)
           TBC_VERIFY_SSL: "false"
-          # Fast mode first; flip to "false" later for a deeper crawl
-          SEED_ONLY: "true"
-          # Show progress every page for now
-          PRINT_EVERY: "1"
-          # Limit breadth for a quick test
-          MAX_PAGES: "200"
-          # Force unbuffered stdout so logs stream live
+          SEED_ONLY: "false"     # go deep now that it's working
+          MAX_PAGES: "2000"
+          PRINT_EVERY: "25"
           PYTHONUNBUFFERED: "1"
         run: python -u tbc_scraper.py
 
-      - name: Summarize run (empty-CSV safe)
+      # Step 2 — download + extract populations
+      - name: Extract populations (OCR/PDF parsing)
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: python -u tbc_extract.py
+
+      - name: Summarize run
         run: |
           python - <<'PY'
           import os, pandas as pd
           from pathlib import Path
-          p = Path("data/derived/sources_index.csv")
-          rows = 0
+          idx = Path("data/derived/sources_index.csv")
+          long = Path("data/derived/tbc_camp_population_long.csv")
+          rows_idx = rows_long = 0
           earliest = latest = 'NA'
-          if p.exists() and p.stat().st_size > 0:
+          if idx.exists() and idx.stat().st_size:
             try:
-              df = pd.read_csv(p)
-              rows = len(df)
-              if rows and "report_date" in df.columns:
-                earliest = df["report_date"].min()
-                latest   = df["report_date"].max()
+              dfi = pd.read_csv(idx)
+              rows_idx = len(dfi)
             except Exception as e:
-              print(f"[warn] could not read CSV: {e}")
-          summ_path = os.environ.get("GITHUB_STEP_SUMMARY")
-          if summ_path:
-            Path(summ_path).write_text(
-              f"# Step 1 summary\n"
-              f"- rows: {rows}\n"
+              print(f"[warn] could not read sources_index.csv: {e}")
+          if long.exists() and long.stat().st_size:
+            try:
+              dfl = pd.read_csv(long)
+              rows_long = len(dfl)
+              if rows_long and "report_date" in dfl.columns:
+                earliest = dfl["report_date"].min()
+                latest   = dfl["report_date"].max()
+            except Exception as e:
+              print(f"[warn] could not read tbc_camp_population_long.csv: {e}")
+          summ = Path(os.environ.get("GITHUB_STEP_SUMMARY", ""))
+          if summ:
+            summ.write_text(
+              f"# Scrape + Extract summary\n"
+              f"- sources_index rows: {rows_idx}\n"
+              f"- extracted rows:    {rows_long}\n"
               f"- earliest: {earliest}\n"
-              f"- latest: {latest}\n"
+              f"- latest:   {latest}\n"
             )
-          else:
-            print(f"rows={rows}, earliest={earliest}, latest={latest}")
           PY
 
       - name: Show sample rows
         run: |
           python - <<'PY'
           import pandas as pd, pathlib
-          p = pathlib.Path("data/derived/sources_index.csv")
+          p = pathlib.Path("data/derived/tbc_camp_population_long.csv")
           if p.exists() and p.stat().st_size:
               df = pd.read_csv(p)
-              print("\nHEAD(10):")
-              print(df.head(10).to_string(index=False))
-              print("\nTAIL(10):")
-              print(df.tail(10).to_string(index=False))
+              print("\nLATEST MONTH SAMPLE:")
+              df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce")
+              latest = df["report_date"].max()
+              print(df[df["report_date"]==latest].head(15).to_string(index=False))
           else:
-              print("sources_index.csv is empty")
+              print("No extracted rows yet.")
           PY
 
-      - name: Commit index CSV
+      - name: Build README table
+        run: python make_readme.py
+
+      - name: Commit outputs
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/derived/sources_index.csv README.md || true
-          git commit -m "update: Step 1 link index" || echo "no changes"
+          git add data/derived/*.csv README.md || true
+          git commit -m "update: extracted camp populations + README" || echo "no changes"
           git push
