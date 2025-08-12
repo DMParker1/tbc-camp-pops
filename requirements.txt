@@ -7,3 +7,4 @@ pymupdf
 pytesseract
 Pillow
 rapidfuzz
+tabulate>=0.9
