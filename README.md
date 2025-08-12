@@ -2,7 +2,7 @@
 
 ![scrape status](https://github.com/DMParker1/tbc-camp-pops/actions/workflows/scrape.yml/badge.svg)
 
-_Last updated: 2025-08-12 21:50 UTC_
+_Last updated: 2025-08-12 22:13 UTC_
 
 **Latest month:** **2025-06**
 
@@ -11,7 +11,6 @@ Below are the per-camp population counts parsed from TBC map(s) for the latest m
 
 | camp_name | population | category |
 | --- | --- | --- |
-| June | 2025 | refugee |
 |  |  |  |
 
 ## Data files
