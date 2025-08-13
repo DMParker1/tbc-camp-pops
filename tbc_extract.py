@@ -281,19 +281,45 @@ def _group_lines(words, y_tol=2):
 
 
 def detect_columns(page) -> Dict[str, Tuple[float, float]]:
+    # Find header bands by looking for TBBC/UNHCR labels and column titles near the top
     words = page.extract_words(use_text_flow=True, y_tolerance=2, x_tolerance=1, keep_blank_chars=False)
     lines = _group_lines(words)
-    spans = {}
-    for L in lines[:80]:  # headers are near the top
-        t = L["text"]
-        for key, pat in HEADER_PATTERNS.items():
-            if pat.search(t):
-                if key not in spans:
-                    spans[key] = [L["x0"], L["x1"]]
-                else:
-                    spans[key][0] = min(spans[key][0], L["x0"])  # widen
-                    spans[key][1] = max(spans[key][1], L["x1"])
-    return {k: (v[0], v[1]) for k, v in spans.items()}
+    top = lines[:120]  # headers live near the top
+    spans: Dict[str, Tuple[float, float]] = {}
+
+    def union_span(match_fn):
+        xs = [(L["x0"], L["x1"]) for L in top if match_fn(L["text"])]
+        return (min(a for a, _ in xs), max(b for _, b in xs)) if xs else None
+
+    rx_tbbc     = re.compile(r"\b(TBC|TBBC|BBC)\b", re.I)
+    rx_verified = re.compile(r"\bverified(\s+caseload)?\b", re.I)
+    rx_feeding  = re.compile(r"\b(feeding\s+figure|feeding|assisted)\b", re.I)
+    rx_unhcr    = re.compile(r"\bUNHCR\b|\bMOI\b", re.I)
+    rx_unh_aux  = re.compile(r"\b(population|verified)\b", re.I)
+
+    # Direct column titles
+    ver_span  = union_span(lambda t: rx_verified.search(t) and not rx_unhcr.search(t))
+    feed_span = union_span(lambda t: rx_feeding.search(t))
+    un_span   = union_span(lambda t: rx_unhcr.search(t) and rx_unh_aux.search(t))
+
+    if ver_span:  spans["tbbc_verified"] = ver_span
+    if feed_span: spans["tbbc_feeding"]  = feed_span
+    if un_span:   spans["unhcr"]         = un_span
+
+    # Fallback: if only UNHCR was found, infer two TBBC bands to the left from numeric clusters
+    if "unhcr" in spans and ("tbbc_verified" not in spans and "tbbc_feeding" not in spans):
+        mid_x = (spans["unhcr"][0] + spans["unhcr"][1]) / 2.0
+        nums_left = [w for w in words if NUM_RE.match(w["text"]) and w["x1"] < mid_x]
+        if nums_left:
+            xs = sorted([(w["x0"], w["x1"]) for w in nums_left])
+            mids = sorted([(a + b) / 2 for a, b in xs])
+            if len(mids) >= 2:
+                med = mids[len(mids) // 2]
+                left  = [(a, b) for a, b in xs if (a + b) / 2 <= med]
+                right = [(a, b) for a, b in xs if (a + b) / 2 >  med]
+                if left:  spans["tbbc_verified"] = (min(a for a, _ in left),  max(b for _, b in left))
+                if right: spans["tbbc_feeding"]  = (min(a for a, _ in right), max(b for _, b in right))
+    return spans
 
 
 def center_x(w):
