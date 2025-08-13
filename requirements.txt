@@ -1,10 +1,10 @@
-beautifulsoup4
-requests
-lxml
-pandas
 pdfplumber
-pymupdf
 pytesseract
 Pillow
-rapidfuzz
+unidecode
+beautifulsoup4
+lxml
+regex
 tabulate>=0.9
+pandas
+requests
