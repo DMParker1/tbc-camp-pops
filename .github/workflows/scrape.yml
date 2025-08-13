@@ -1,37 +1,42 @@
 name: scrape-and-index
 
 on:
-  schedule:
-    - cron: "23 5 7 * *"   # 05:23 UTC on the 7th each month
   workflow_dispatch:
     inputs:
       extract_since:
         description: "EXTRACT_SINCE (YYYY-MM-DD, blank = all)"
         required: false
-        default: "2018-01-01"
+        default: ""
+      extract_until:
+        description: "EXTRACT_UNTIL (YYYY-MM-DD, blank = latest)"
+        required: false
+        default: ""
+      process_order:
+        description: "Process order"
+        required: false
+        type: choice
+        options: [oldest, newest]
+        default: oldest
       extract_max_files:
-        description: "EXTRACT_MAX_FILES (per run)"
+        description: "Max files to extract this run (0 = none)"
         required: false
         default: "250"
-      process_order:
-        description: "PROCESS_ORDER (newest|oldest)"
-        required: false
-        default: "newest"
-      stop_after_found:
-        description: "Crawler STOP_AFTER_FOUND (0 = none)"
-        required: false
-        default: "1500"
-      seed_only:
-        description: "SEED_ONLY (true|false)"
-        required: false
-        default: "true"
       skip_crawl:
-        description: "Skip crawler step (use existing sources_index.csv)"
+        description: "Reuse existing sources_index.csv without crawling"
         required: false
         default: "true"
+      seed_only:
+        description: "When crawling, only hit seed pages"
+        required: false
+        default: "true"
+      stop_after_found:
+        description: "Crawler: stop after N links found (0 = unlimited)"
+        required: false
+        default: "0"
 
-permissions:
-  contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   run:
@@ -41,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -50,96 +55,46 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install tabulate
           python -m pip install --upgrade certifi
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
 
-      - name: Cache raw artifacts
-        uses: actions/cache@v4
-        with:
-          path: data/raw
-          key: raw-cache-${{ runner.os }}-${{ hashFiles('data/derived/sources_index.csv') }}
-          restore-keys: |
-            raw-cache-${{ runner.os }}-
+      - name: Show inputs
+        run: |
+          echo "extract_since=${{ inputs.extract_since }}"
+          echo "extract_until=${{ inputs.extract_until }}"
+          echo "process_order=${{ inputs.process_order }}"
+          echo "extract_max_files=${{ inputs.extract_max_files }}"
+          echo "skip_crawl=${{ inputs.skip_crawl }}"
+          echo "seed_only=${{ inputs.seed_only }}"
+          echo "stop_after_found=${{ inputs.stop_after_found }}"
 
-      # Step 1 — crawl & index (runs on schedule; skipped by default on manual runs)
-      - name: Crawl + index links (no OCR yet)
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_crawl != 'true' }}
+      - name: Crawl + index (build sources_index.csv)
+        if: ${{ inputs.skip_crawl != 'true' }}
         env:
+          PYTHONUNBUFFERED: "1"
           TBC_VERIFY_SSL: "false"
           SEED_ONLY: "${{ inputs.seed_only || 'true' }}"
-          MAX_PAGES: "800"
-          PRINT_EVERY: "10"
-          STOP_AFTER_FOUND: "${{ inputs.stop_after_found || '1500' }}"
-          PYTHONUNBUFFERED: "1"
-        run: python -u tbc_scraper.py
+          MAX_PAGES: "2000"
+          PRINT_EVERY: "25"
+          STOP_AFTER_FOUND: "${{ inputs.stop_after_found || '0' }}"
+        run: |
+          python -u tbc_scraper.py
 
-      # Step 2 — extract & OCR
       - name: Extract populations (OCR/PDF parsing)
         env:
           PYTHONUNBUFFERED: "1"
           TBC_VERIFY_SSL: "false"
-          EXTRACT_SINCE: "${{ inputs.extract_since || '2018-01-01' }}"
+          EXTRACT_SINCE: "${{ inputs.extract_since || '' }}"
+          EXTRACT_UNTIL: "${{ inputs.extract_until || '' }}"
           EXTRACT_MAX_FILES: "${{ inputs.extract_max_files || '250' }}"
-          PROCESS_ORDER: "${{ inputs.process_order || 'newest' }}"
+          PROCESS_ORDER: "${{ inputs.process_order || 'oldest' }}"
           RESUME_MODE: "true"
           OCR_DPI: "200"
         run: python -u tbc_extract.py
 
-      - name: Summarize run
-        run: |
-          python - <<'PY'
-          import os, pandas as pd
-          from pathlib import Path
-          idx = Path("data/derived/sources_index.csv")
-          long = Path("data/derived/tbc_camp_population_long.csv")
-          rows_idx = rows_long = 0
-          earliest = latest = 'NA'
-          if idx.exists() and idx.stat().st_size:
-            try:
-              dfi = pd.read_csv(idx)
-              rows_idx = len(dfi)
-            except Exception as e:
-              print(f"[warn] could not read sources_index.csv: {e}")
-          if long.exists() and long.stat().st_size:
-            try:
-              dfl = pd.read_csv(long)
-              rows_long = len(dfl)
-              if rows_long and "report_date" in dfl.columns:
-                dfl["report_date"] = pd.to_datetime(dfl["report_date"], errors="coerce")
-                earliest = str(dfl["report_date"].min().date())
-                latest   = str(dfl["report_date"].max().date())
-            except Exception as e:
-              print(f"[warn] could not read tbc_camp_population_long.csv: {e}")
-          summ = Path(os.environ.get("GITHUB_STEP_SUMMARY", ""))
-          if summ:
-            summ.write_text(
-              f"# Scrape + Extract summary\n"
-              f"- sources_index rows: {rows_idx}\n"
-              f"- extracted rows:    {rows_long}\n"
-              f"- earliest: {earliest}\n"
-              f"- latest:   {latest}\n"
-            )
-          PY
-
-      - name: Show sample rows
-        run: |
-          python - <<'PY'
-          import pandas as pd, pathlib
-          p = pathlib.Path("data/derived/tbc_camp_population_long.csv")
-          if p.exists() and p.stat().st_size:
-              df = pd.read_csv(p)
-              df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce")
-              latest = df["report_date"].max()
-              print("\nLATEST MONTH SAMPLE:")
-              print(df[df["report_date"]==latest].head(15).to_string(index=False))
-          else:
-              print("No extracted rows yet.")
-          PY
-
       - name: Build README table
-        run: python make_readme.py
+        run: python -u make_readme.py
 
       - name: Commit outputs
         run: |
@@ -147,4 +102,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/derived/*.csv README.md || true
           git commit -m "update: scrape/extract + README" || echo "no changes"
-          git push
+          git push || echo "no push (likely a PR workflow)"
