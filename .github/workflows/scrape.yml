@@ -23,17 +23,19 @@ on:
         default: "250"
       skip_crawl:
         description: "Reuse existing sources_index.csv without crawling"
+        type: boolean
         required: false
-        default: "true"
+        default: true
       seed_only:
         description: "When crawling, only hit seed pages"
+        type: boolean
         required: false
-        default: "true"
+        default: true
       stop_after_found:
-        description: "Crawler: stop after N links found (0 = unlimited)"
+        description: "Crawler: stop after first OK link per month"
+        type: boolean
         required: false
-        default: "0"
-      # New optional crawler controls
+        default: true
       scrape_since:
         description: "SCRAPE_SINCE (YYYY-MM-DD, default 1992-01-01)"
         required: false
@@ -42,20 +44,10 @@ on:
         description: "SCRAPE_UNTIL (YYYY-MM-DD, blank = today)"
         required: false
         default: ""
-      reliefweb_fallback:
-        description: "Use ReliefWeb fallback when TBC URL not found"
-        required: false
-        type: choice
-        options: [true, false]
-        default: true
       max_pages:
-        description: "Archive crawl page budget"
+        description: "Archive crawl page budget (0 = disable crawl)"
         required: false
         default: "2000"
-      print_every:
-        description: "Archive crawl progress cadence"
-        required: false
-        default: "25"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -97,8 +89,6 @@ jobs:
           echo "scrape_since=${{ inputs.scrape_since }}"
           echo "scrape_until=${{ inputs.scrape_until }}"
           echo "reliefweb_fallback=${{ inputs.reliefweb_fallback }}"
-          echo "max_pages=${{ inputs.max_pages }}"
-          echo "print_every=${{ inputs.print_every }}"
 
       - name: Crawl + index (build sources_index.csv)
         env:
@@ -107,12 +97,10 @@ jobs:
           SKIP_CRAWL: "${{ inputs.skip_crawl || 'true' }}"   
           SEED_ONLY: "${{ inputs.seed_only || 'true' }}"
           MAX_PAGES: "${{ inputs.max_pages || '2000' }}"
-          PRINT_EVERY: "${{ inputs.print_every || '25' }}"
           STOP_AFTER_FOUND: ${{ inputs.stop_after_found != '0' }}
           PROCESS_ORDER: "${{ inputs.process_order || 'oldest' }}"
           SCRAPE_SINCE: "${{ inputs.scrape_since || '1992-01-01' }}"
           SCRAPE_UNTIL: "${{ inputs.scrape_until || '' }}"
-          RELIEFWEB_FALLBACK: "${{ inputs.reliefweb_fallback || 'true' }}"
         run: |
           python -u tbc_scraper.py
 
