@@ -31,6 +31,7 @@ import os, re, sys, time, json
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 from datetime import datetime, date
+from typing import Optional
 
 import pandas as pd
 import requests
@@ -340,8 +341,8 @@ def generate_candidates_df() -> pd.DataFrame:
         picked = None
         for u in urls:
             if head_or_get_exists(u):
-                picked = u
-                if STOP_AFTER_FOUND:
+            picked = u
+            if STOP_AFTER_FOUND:
                 break
         # Optionally try ReliefWeb for the month
         if not picked:
