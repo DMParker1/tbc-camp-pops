@@ -393,28 +393,71 @@ def detect_series_by_header(header_line, s, e):
     return "unknown"
 
 def find_header_and_columns(lines):
-    pat_assisted = re.compile(r"(TBC|TBBC).*?Assist", re.I)
-    pat_verified = re.compile(r"(UNHCR|MOI).*?(Verify|Population)", re.I)
-    for i, line in enumerate(lines[:80]):
-        if pat_assisted.search(line) and pat_verified.search(line):
-            spans = []
-            for m in re.finditer(r"(TBC.*?Assist.*?|TBBC.*?Assist.*?|UNHCR.*?Verify.*?|MOI.*?Verify.*?)", line, re.I):
-                spans.append((m.start(), m.end()))
-            if not spans:
-                continue
-            spans.sort()
-            expanded = []
-            for j, (s, e) in enumerate(spans):
-                e2 = spans[j+1][0] if j+1 < len(spans) else len(line)
-                expanded.append((s, e2))
-            cols, seen = [], set()
-            for s, e in expanded:
-                ser = detect_series_by_header(line, s, e)
-                if ser in ("tbc","tbbc","unhcr") and ser not in seen:
-                    cols.append((s, e, ser))
-                    seen.add(ser)
-            cols.sort(key=lambda x: x[0])
+    """
+    Locate header(s) that declare TBBC/TBC Assisted/Feeding and UNHCR/MOI Verified/Population.
+    Now looks across a 3-line window to handle layouts where:
+        TBBC
+        Verified Caseload   Feeding Figure   MOI/ UNHCR Population
+    Returns: (header_idx, [(start,end,series), ...]) ordered left->right
+    """
+    pat_any_tbbc   = re.compile(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b)", re.I)
+    pat_verified   = re.compile(r"verified(\s+caseload)?", re.I)
+    pat_feeding    = re.compile(r"(feeding\s+figure|feeding|assisted)", re.I)
+    pat_unhcr      = re.compile(r"(?:\bMOI\b[^A-Za-z0-9/]*\/\s*)?\bUNHCR\b", re.I)
+    pat_unhcr_aux  = re.compile(r"(population|verified)", re.I)
+
+    # Examine the first ~80 lines (typical header area), but use a 3-line rolling window
+    N = min(80, len(lines))
+    for i in range(N):
+        win = lines[i:i+3]
+        if not win:
+            continue
+        window_text = " ".join(win)
+        # If the window does not look like a header, keep scanning
+        if not ((pat_any_tbbc.search(window_text) and (pat_verified.search(window_text) or pat_feeding.search(window_text)))
+                or (pat_unhcr.search(window_text) and pat_unhcr_aux.search(window_text))):
+            continue
+
+        # Find left-to-right spans within the window_text
+        spans = []
+        for m in re.finditer(r"(?:TBC|TBBC|BBC).*?(?:Assist|Feeding)", window_text, re.I):
+            spans.append((m.start(), m.end(), "tbc_tbbc_assist"))
+        for m in re.finditer(r"(?:UNHCR|MOI).*?(?:Verify|Population)", window_text, re.I):
+            spans.append((m.start(), m.end(), "unhcr"))
+
+        if not spans:
+            # Fall back to separate cues for TBBC verified/feeding if the above didn’t match
+            if pat_verified.search(window_text):
+                spans.append((0, len(window_text), "tbc_tbbc_assist"))
+            if pat_unhcr.search(window_text) and pat_unhcr_aux.search(window_text):
+                spans.append((0, len(window_text), "unhcr"))
+
+        if not spans:
+            continue
+
+        spans.sort(key=lambda x: x[0])
+
+        # Expand each span to the next span’s start (or end of line) so we get column bands
+        expanded = []
+        for j, (s, e, tag) in enumerate(spans):
+            e2 = spans[j+1][0] if j+1 < len(spans) else len(window_text)
+            expanded.append((s, e2, tag))
+
+        # Map tags to the series keys we use downstream, de-duplicated and ordered left->right
+        cols, seen = [], set()
+        for s, e, tag in expanded:
+            if tag == "unhcr":
+                ser = "unhcr"
+            else:
+                # This column holds TBBC/TBC numbers (verified/feeding will be separated later)
+                ser = "tbc"  # upstream code already handles 'tbbc' synonymically
+            if ser not in seen:
+                cols.append((s, e, ser))
+                seen.add(ser)
+
+        if cols:
             return i, cols
+
     return None, []
 
 def slice_by_cols(line, cols):
