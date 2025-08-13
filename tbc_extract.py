@@ -375,15 +375,29 @@ def segment_rows(page, canon_ordered, syns, report_date: dt.date, active_map, y_
     return rows
 
 
-def extract_values_from_page(page, report_date: dt.date, source_url: str, cols: Dict[str, Tuple[float, float]], rows):
+def extract_values_from_page(page, report_date: dt.date, source_url: str,
+                             cols: Dict[str, Tuple[float, float]], rows):
+    # Pull words from the page
     words = page.extract_words(use_text_flow=True, y_tolerance=2, x_tolerance=1, keep_blank_chars=False)
-    numerics = [w for w in words if NUM_RE.match(w["text"])]
+
+    # Collect numeric-like tokens, tolerating footnote marks (e.g., 50,624*, 46,222¹)
+    num_tokens = []
+    for w in words:
+        val = parse_int_relaxed(w.get("text", ""))
+        if val is not None:
+            num_tokens.append((w, val))
+
     out = []
     for row in rows:
         y0, y1 = row["y0"], row["y1"]
-        in_row = [w for w in numerics if y0 <= center_y(w) <= y1]
-        for w in in_row:
+
+        # keep only numbers whose vertical center lies within this camp row band
+        in_row = [(w, v) for (w, v) in num_tokens if y0 <= center_y(w) <= y1]
+
+        for (w, val) in in_row:
             cx = center_x(w)
+
+            # Determine series by column band
             series, subseries = None, ""
             if "tbbc_verified" in cols and cols["tbbc_verified"][0] <= cx <= cols["tbbc_verified"][1]:
                 series, subseries = "tbbc", "verified"
@@ -392,11 +406,13 @@ def extract_values_from_page(page, report_date: dt.date, source_url: str, cols: 
             elif "unhcr" in cols and cols["unhcr"][0] <= cx <= cols["unhcr"][1]:
                 series, subseries = "unhcr", "verified"
             else:
-                continue
-            val = int(re.sub(r"[^\d]", "", w["text"]))
+                continue  # skip numbers outside the recognized column spans
+
+            # Sanity / per-camp bounds
             lo, hi = CAMP_BOUNDS.get(row["camp"], (GLOBAL_MIN, GLOBAL_MAX))
             if not (lo <= val <= hi):
                 continue
+
             out.append({
                 "date": report_date.strftime("%Y-%m-%d"),
                 "camp": row["camp"],
