@@ -253,6 +253,21 @@ def is_active(camp: str, report_date: dt.date, active_map: Dict[str, Tuple[Optio
 # ---------- Geometry parsing (pdfplumber) ----------
 NUM_RE = re.compile(r"^[\s]*[0-9][0-9,]*[\s]*$")
 
+def parse_int_relaxed(token: str):
+    """
+    Return an int if token contains a plausible population number,
+    even if it has footnote marks or stray punctuation; else None.
+    """
+    if token is None:
+        return None
+    digits = re.sub(r"[^\d]", "", str(token))
+    if len(digits) < 3:   # ignore very small / non-population tokens
+        return None
+    try:
+        return int(digits)
+    except Exception:
+        return None
+
 HEADER_PATTERNS = {
     "tbbc_verified": re.compile(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b).*verified", re.I),
     "tbbc_feeding":  re.compile(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b).*(feeding|assisted)", re.I),
