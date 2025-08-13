@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 """
-tbc_extract.py — column-aware, line-locked extractor with series tagging.
+TBC camp-populations extractor — geometry-locked, header-anchored parser
 
-Adds:
-- EXTRACT_UNTIL upper bound
-- Same-line parsing (or next-line if wrap)
-- Column detection: prefer TBC/TBBC Assisted; fallback to UNHCR/MOI Verified
-- Emits 'series' per row and builds preferred-series WIDE CSV (TBC/TBBC > UNHCR > unknown)
+What this version adds/fixes
+- **Series split is reliable**: columns are anchored to detected headers (TBC/TBBC Verified/Feeding/Assisted vs MOI/UNHCR Verified/Population) using x‑spans.
+- **Mae La vs Mae La Oon**: camp rows are segmented from camp-label bounding boxes and numbers are accepted only if their center‑y lies inside that row's y‑band (prevents row bleed and name collisions).
+- **Subseries preserved**: writes `subseries` (verified|feeding|assisted|—) in the long file; preferred wide still follows TBC/TBBC > UNHCR.
+- **Date bounds**: honors `EXTRACT_SINCE` and `EXTRACT_UNTIL` (env vars) before work selection.
+- **Dual audit pivot**: also emits `tbc_camp_population_wide_dual.csv` with both series side‑by‑side for QA.
+
+Dependencies (ensure in requirements.txt):
+  pdfplumber, unidecode, pandas, requests, Pillow, pytesseract, PyMuPDF (optional OCR path), tabulate>=0.9
 """
 
 import os, io, re, sys, time, logging
 from pathlib import Path
 from urllib.parse import urlparse
+import datetime as dt
+from typing import Dict, List, Optional, Tuple
+
 import pandas as pd
 import requests
 import urllib3
+from unidecode import unidecode
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
@@ -26,6 +34,7 @@ DERIVED_DIR  = Path("data/derived")
 INDEX_CSV    = DERIVED_DIR / "sources_index.csv"
 OUT_LONG     = DERIVED_DIR / "tbc_camp_population_long.csv"
 OUT_WIDE     = DERIVED_DIR / "tbc_camp_population_wide.csv"
+OUT_WIDE_DUAL= DERIVED_DIR / "tbc_camp_population_wide_dual.csv"
 
 # ---------- Env ----------
 EXTRACT_SINCE     = os.getenv("EXTRACT_SINCE", "").strip()
@@ -37,21 +46,37 @@ OCR_DPI           = int(os.getenv("OCR_DPI", "200"))
 OCR_PSM           = int(os.getenv("OCR_PSM", "6"))  # line-by-line
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/3.2; +github.com/DMParker1/tbc-camp-pops)",
+    "User-Agent": "Mozilla/5.0 (compatible; TBC-Extractor/4.0; +github.com/DMParker1/tbc-camp-pops)",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
 # ---------- Camps & bounds ----------
-KNOWN_CAMPS = [
-    "Ban Mai Nai Soi","Ban Mae Surin","Mae La Oon","Mae Ra Ma Luang",
-    "Mae La","Umpiem Mai","Nupo","Ban Don Yang","Tham Hin"
+DEFAULT_CANON = [
+    "Mae Ra Ma Luang", "Mae La Oon", "Umpiem Mai",
+    "Ban Don Yang", "Tham Hin", "Nupo", "Nu Po", "Mae La",
+    "Ban Mai Nai Soi", "Ban Mae Surin", "Shoklo",
+    "Site 1", "Site 2", "Site 3"
 ]
+DEFAULT_SYNS = {
+    "Mae La Oon": ["Mae La Oon", "Mae La-Oon", "Mae LaOon"],
+    "Mae Ra Ma Luang": ["Mae Ra Ma Luang", "Mae Rama Luang", "Mae Ra Mat Luang"],
+    "Umpiem Mai": ["Umpiem", "Umphiem", "Umpiem Mai"],
+    "Nu Po": ["Nu Po", "Nupo"],
+    "Nupo": ["Nu Po", "Nupo"],
+    "Ban Don Yang": ["Ban Don Yang", "Baan Don Yang", "Ban Donyang"],
+    "Tham Hin": ["Tham Hin", "Tam Hin"],
+    "Mae La": ["Mae La", "Maela"],
+    "Ban Mai Nai Soi": ["Ban Mai Nai Soi"],
+    "Ban Mae Surin": ["Ban Mae Surin"],
+    "Shoklo": ["Shoklo", "Sho Klo"],
+}
 
 GLOBAL_MIN = 50
 GLOBAL_MAX = 300_000
 CAMP_BOUNDS = {
     "Mae La":          (10_000,  70_000),
     "Umpiem Mai":      (3_000,   45_000),
+    "Nu Po":           (2_000,   40_000),
     "Nupo":            (2_000,   40_000),
     "Mae Ra Ma Luang": (2_000,   50_000),
     "Mae La Oon":      (2_000,   40_000),
@@ -99,7 +124,7 @@ def download(url, report_date):
     out.write_bytes(data)
     return out
 
-# ---------- OCR/Text ----------
+# ---------- Text & OCR ----------
 def extract_text_from_pdf(pdf_path):
     txt_all = []
     method = "pdf-text"
@@ -152,7 +177,10 @@ def extract_text_from_image(img_path):
         return "", "img-fail"
 
 # ---------- Helpers ----------
-def normalize(s):
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9 ]", "", unidecode((s or "").lower())).strip()
+
+def normalize_whitespace(s):
     s = (s or "").replace("\u00a0", " ")
     s = re.sub(r"[^\S\r\n]+", " ", s)
     return s
@@ -162,17 +190,186 @@ def detect_category(text):
         return "idp"
     return "refugee"
 
-def build_camp_patterns():
-    joiner = r"[ _\-]*"
-    return {
-        camp: re.compile(fr"\b{joiner.join(map(re.escape, camp.split()))}\b", re.I)
-        for camp in KNOWN_CAMPS
-    }
+# Optional, date-aware lineage file
+LINEAGE_CSV = Path("data/reference/camp_lineage.csv")
 
-CAMP_PATS = build_camp_patterns()
+def load_lineage() -> Tuple[List[str], Dict[str, List[str]], Dict[str, Tuple[Optional[dt.date], Optional[dt.date]]]]:
+    if not LINEAGE_CSV.exists():
+        canon = sorted(DEFAULT_CANON, key=len, reverse=True)
+        syns = DEFAULT_SYNS
+        active = {}
+        return canon, syns, active
+    df = pd.read_csv(LINEAGE_CSV)
+    canon, syns, active = [], {}, {}
+    for _, r in df.iterrows():
+        c = str(r.get("canonical", "")).strip()
+        if not c:
+            continue
+        canon.append(c)
+        al = [x.strip() for x in str(r.get("aliases", "")).split(";") if x.strip()]
+        syns[c] = [c] + al
+        st = str(r.get("start", "")).strip() or None
+        en = str(r.get("end", "")).strip() or None
+        st_d = dt.datetime.strptime(st, "%Y-%m-%d").date() if st else None
+        en_d = dt.datetime.strptime(en, "%Y-%m-%d").date() if en else None
+        active[c] = (st_d, en_d)
+    canon = sorted(canon, key=len, reverse=True)
+    return canon, syns, active
+
+def is_active(camp: str, report_date: dt.date, active_map: Dict[str, Tuple[Optional[dt.date], Optional[dt.date]]]):
+    if camp not in active_map:
+        return True
+    st, en = active_map[camp]
+    if st and report_date < st:
+        return False
+    if en and report_date > en:
+        return False
+    return True
+
+# ---------- Geometry parsing (pdfplumber) ----------
+NUM_RE = re.compile(r"^[\s]*[0-9][0-9,]*[\s]*$")
+
+HEADER_PATTERNS = {
+    "tbbc_verified": re.compile(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b).*verified", re.I),
+    "tbbc_feeding":  re.compile(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b).*(feeding|assisted)", re.I),
+    "unhcr":         re.compile(r"(?:\bMOI/)?\bUNHCR\b.*(population|verified)?", re.I),
+}
+
+def _group_lines(words, y_tol=2):
+    lines = []
+    for w in sorted(words, key=lambda w: (w["top"], w["x0"])):
+        placed = False
+        for L in lines:
+            if abs(L["top"] - w["top"]) <= y_tol:
+                L["words"].append(w)
+                L["top"] = min(L["top"], w["top"])  # tighten
+                L["bottom"] = max(L["bottom"], w["bottom"])  # expand
+                placed = True
+                break
+        if not placed:
+            lines.append({"top": w["top"], "bottom": w["bottom"], "words": [w]})
+    for L in lines:
+        L["x0"] = min(w["x0"] for w in L["words"])
+        L["x1"] = max(w["x1"] for w in L["words"])
+        L["text"] = " ".join(w["text"] for w in sorted(L["words"], key=lambda w: w["x0"]))
+    return lines
+
+def detect_columns(page) -> Dict[str, Tuple[float, float]]:
+    words = page.extract_words(use_text_flow=True, y_tolerance=2, x_tolerance=1, keep_blank_chars=False)
+    lines = _group_lines(words)
+    spans = {}
+    for L in lines[:80]:  # headers live near the top
+        t = L["text"]
+        for key, pat in HEADER_PATTERNS.items():
+            if pat.search(t):
+                if key not in spans:
+                    spans[key] = [L["x0"], L["x1"]]
+                else:
+                    spans[key][0] = min(spans[key][0], L["x0"])  # widen
+                    spans[key][1] = max(spans[key][1], L["x1"])
+    # flatten -> (x0,x1)
+    spans = {k: (v[0], v[1]) for k, v in spans.items()}
+    return spans
+
+def center_x(w):
+    return (w["x0"] + w["x1"]) / 2.0
+
+def center_y(w):
+    return (w["top"] + w["bottom"]) / 2.0
+
+def match_camp_from_text(text: str, canon_ordered: List[str], syns: Dict[str, List[str]]) -> Optional[str]:
+    lab = _norm(text)
+    for canon in canon_ordered:
+        for v in syns.get(canon, [canon]):
+            if re.search(rf"\b{re.escape(_norm(v))}\b", lab):
+                return canon
+    return None
+
+def segment_rows(page, canon_ordered, syns, report_date: dt.date, active_map, y_pad=2):
+    words = page.extract_words(use_text_flow=True, y_tolerance=2, x_tolerance=1, keep_blank_chars=False)
+    lines = _group_lines(words)
+    rows = []
+    claimed = []  # y-span list to avoid duplicates
+    for L in lines:
+        camp = match_camp_from_text(L["text"], canon_ordered, syns)
+        if not camp:
+            continue
+        if not is_active(camp, report_date, active_map):
+            continue
+        y0, y1 = L["top"] - y_pad, L["bottom"] + y_pad
+        # skip if overlapping a previously claimed span (longest-name-first ordering already helps)
+        overlap = any(not (y1 < a or y0 > b) for (a, b) in claimed)
+        if overlap:
+            continue
+        claimed.append((y0, y1))
+        rows.append({"camp": camp, "y0": y0, "y1": y1, "x0": L["x0"], "x1": L["x1"]})
+    rows.sort(key=lambda r: (r["y0"], r["camp"]))
+    return rows
+
+def extract_values_from_page(page, report_date: dt.date, source_url: str, cols: Dict[str, Tuple[float, float]], rows):
+    words = page.extract_words(use_text_flow=True, y_tolerance=2, x_tolerance=1, keep_blank_chars=False)
+    numerics = [w for w in words if NUM_RE.match(w["text"])]
+    out = []
+    for row in rows:
+        y0, y1 = row["y0"], row["y1"]
+        in_row = [w for w in numerics if y0 <= center_y(w) <= y1]
+        for w in in_row:
+            cx = center_x(w)
+            series, subseries = None, ""
+            if "tbbc_verified" in cols and cols["tbbc_verified"][0] <= cx <= cols["tbbc_verified"][1]:
+                series, subseries = "tbbc", "verified"
+            elif "tbbc_feeding" in cols and cols["tbbc_feeding"][0] <= cx <= cols["tbbc_feeding"][1]:
+                series, subseries = "tbbc", "feeding"
+            elif "unhcr" in cols and cols["unhcr"][0] <= cx <= cols["unhcr"][1]:
+                series, subseries = "unhcr", "verified"
+            else:
+                continue
+            val = int(re.sub(r"[^\d]", "", w["text"]))
+            # sanity/bounds
+            lo, hi = CAMP_BOUNDS.get(row["camp"], (GLOBAL_MIN, GLOBAL_MAX))
+            if not (lo <= val <= hi):
+                continue
+            out.append({
+                "date": report_date.strftime("%Y-%m-%d"),
+                "camp": row["camp"],
+                "series": series,
+                "subseries": subseries,
+                "value": val,
+                "source_url": source_url,
+                "parse_notes": "geom_header_locked",
+                "parse_confidence": 0.98,
+            })
+    return out
+
+def parse_pdf_geometry(pdf_path: Path, report_date: dt.date, source_url: str) -> List[Dict]:
+    import pdfplumber
+    canon, syns, active_map = load_lineage()
+    all_rows: List[Dict] = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            cols = detect_columns(page)
+            if not cols:
+                continue
+            rows = segment_rows(page, canon, syns, report_date, active_map)
+            if not rows:
+                continue
+            rows_out = extract_values_from_page(page, report_date, source_url, cols, rows)
+            all_rows.extend(rows_out)
+    return all_rows
+
+# ---------- Fallback (text-based) ----------
+# Conservative fallback to keep older behavior when geometry isn't available
+JOINER = r"[ _\-]*"
+KNOWN_CAMPS_FALLBACK = [
+    "Ban Mai Nai Soi","Ban Mae Surin","Mae La Oon","Mae Ra Ma Luang",
+    "Mae La","Umpiem Mai","Nupo","Nu Po","Ban Don Yang","Tham Hin"
+]
+CAMP_PATS_FALLBACK = {
+    camp: re.compile(fr"\b{JOINER.join(map(re.escape, camp.split()))}\b", re.I)
+    for camp in KNOWN_CAMPS_FALLBACK
+}
 
 def num_candidates(s):
-    # yield numeric candidates as ints, ignore plain 4-digit years and out-of-range values
     for m in re.finditer(r"[0-9][0-9,\.\s]{1,12}", s):
         token = m.group(0).strip()
         digits = re.sub(r"[^\d]", "", token)
@@ -185,8 +382,8 @@ def num_candidates(s):
             continue
         yield val
 
-def detect_series_by_header(header_line, col_start, col_end):
-    seg = header_line[col_start:col_end].lower()
+def detect_series_by_header(header_line, s, e):
+    seg = header_line[s:e].lower()
     if "tbbc" in seg:
         return "tbbc"
     if "tbc" in seg and "assist" in seg:
@@ -196,14 +393,9 @@ def detect_series_by_header(header_line, col_start, col_end):
     return "unknown"
 
 def find_header_and_columns(lines):
-    """
-    Locate a header line that declares the Assisted and Verified columns.
-    Return (header_idx, [(start,end,series), ...]) ordered left->right.
-    """
     pat_assisted = re.compile(r"(TBC|TBBC).*?Assist", re.I)
     pat_verified = re.compile(r"(UNHCR|MOI).*?(Verify|Population)", re.I)
-
-    for i, line in enumerate(lines[:80]):  # usually near the top
+    for i, line in enumerate(lines[:80]):
         if pat_assisted.search(line) and pat_verified.search(line):
             spans = []
             for m in re.finditer(r"(TBC.*?Assist.*?|TBBC.*?Assist.*?|UNHCR.*?Verify.*?|MOI.*?Verify.*?)", line, re.I):
@@ -233,29 +425,17 @@ def same_or_next_line(lines, i):
     nxt = lines[i+1] if i+1 < len(lines) else ""
     return [line, nxt]
 
-# ---------- Parsing ----------
-def parse_rows(text):
-    """
-    Column-aware, line-locked parsing:
-      - Detect header columns
-      - For each line with a camp label, read numeric candidates from each population column
-        on that same line; if none, also check the immediate next line (wrap)
-      - Enforce camp bounds; keep best per (camp, series)
-    """
+def parse_rows_text(text):
     rows = []
-    clean = normalize(text)
+    clean = normalize_whitespace(text)
     category = detect_category(clean)
     lines = [ln.rstrip("\n") for ln in clean.splitlines() if ln.strip()]
-
     header_idx, cols = find_header_and_columns(lines)
-    best = {}  # (camp, series) -> value
-
+    best = {}
     for i, line in enumerate(lines):
-        for camp, cre in CAMP_PATS.items():
+        for camp, cre in CAMP_PATS_FALLBACK.items():
             if not cre.search(line):
                 continue
-
-            # same line, then next (wrap)
             for candidate_line in same_or_next_line(lines, i):
                 found_vals = []
                 if cols:
@@ -263,7 +443,6 @@ def parse_rows(text):
                         for val in num_candidates(seg):
                             found_vals.append((ser, val))
                 else:
-                    # fallback: to-the-right window on the same line
                     m = cre.search(candidate_line)
                     if m:
                         right = candidate_line[m.end():][:80]
@@ -272,10 +451,8 @@ def parse_rows(text):
                         if re.search(r"\bUNHCR\b|\bMOI\b", right, re.I): ser = "unhcr"
                         for val in num_candidates(right):
                             found_vals.append((ser, val))
-
                 if not found_vals:
                     continue
-
                 lo, hi = CAMP_BOUNDS.get(camp, (GLOBAL_MIN, GLOBAL_MAX))
                 for ser, val in found_vals:
                     if not (lo <= val <= hi):
@@ -284,22 +461,22 @@ def parse_rows(text):
                     prev = best.get(key)
                     if (prev is None) or (val > prev):
                         best[key] = val
-                # got data for this camp on (this/next) line -> move on
                 if any(k[0] == camp for k in best):
                     break
-
     for (camp, ser), val in best.items():
+        sub = "verified" if ser in ("tbc","tbbc") else ("verified" if ser=="unhcr" else "")
         rows.append({
-            "camp_name": camp,
-            "population": int(val),
-            "category": category,
+            "camp": camp,
             "series": ser,
-            "parse_notes": "line_locked_column",
-            "parse_confidence": 0.97 if ser in ("tbc","tbbc","unhcr") else 0.9,
+            "subseries": sub,
+            "value": int(val),
+            "parse_notes": "text_line_locked",
+            "parse_confidence": 0.90 if ser in ("tbc","tbbc","unhcr") else 0.85,
         })
     return rows
 
-# ---------- Main ----------
+# ---------- Main pipeline ----------
+
 def main():
     if not INDEX_CSV.exists() or INDEX_CSV.stat().st_size == 0:
         print(f"[error] missing or empty {INDEX_CSV}", flush=True)
@@ -309,10 +486,11 @@ def main():
     if df_idx.empty:
         print("[warn] sources_index.csv has 0 rows", flush=True)
         pd.DataFrame(columns=[
-            "report_date","camp_name","population","category","series",
+            "report_date","camp_name","population","category","series","subseries",
             "source_url","file_name","extract_method","parse_notes","parse_confidence"
         ]).to_csv(OUT_LONG, index=False)
         pd.DataFrame().to_csv(OUT_WIDE, index=False)
+        pd.DataFrame().to_csv(OUT_WIDE_DUAL, index=False)
         return
 
     with pd.option_context("mode.use_inf_as_na", True):
@@ -332,7 +510,6 @@ def main():
         except Exception as e:
             print(f"[warn] bad EXTRACT_UNTIL={EXTRACT_UNTIL}: {e}", flush=True)
 
-    # Resume: skip already processed (source_url, file_name)
     existing = pd.DataFrame()
     processed_keys = set()
     if RESUME_MODE and OUT_LONG.exists() and OUT_LONG.stat().st_size:
@@ -345,7 +522,6 @@ def main():
         except Exception as e:
             print(f"[warn] could not read existing LONG CSV: {e}", flush=True)
 
-    # Order & limit
     df_idx = df_idx.dropna(subset=["source_url"])
     if PROCESS_ORDER == "oldest":
         df_idx = df_idx.sort_values(["report_date", "file_name"], na_position="last")
@@ -354,7 +530,7 @@ def main():
 
     candidates = []
     for _, r in df_idx.iterrows():
-        key = (str(r.get("source_url","")), str(r.get("file_name","")))
+        key = (str(r.get("source_url", "")), str(r.get("file_name", "")))
         if RESUME_MODE and key in processed_keys:
             continue
         candidates.append(r)
@@ -385,56 +561,96 @@ def main():
         try:
             if ext == ".pdf":
                 text, method = extract_text_from_pdf(local)
-            elif ext in (".jpg",".jpeg",".png"):
+            elif ext in (".jpg", ".jpeg", ".png"):
                 text, method = extract_text_from_image(local)
             else:
                 text, method = extract_text_from_image(local)
         except Exception as e:
             print(f"[warn] extraction failed: {local.name} -> {e}", flush=True)
 
+        # First try GEOMETRY on the original PDF bytes (only possible for PDFs)
+        geom_rows: List[Dict] = []
+        if local.suffix.lower() == ".pdf":
+            try:
+                rd_date = dt.datetime.strptime(rd_str, "%Y-%m-%d").date() if rd_str else None
+                if rd_date is not None:
+                    geom_rows = parse_pdf_geometry(local, rd_date, url)
+            except Exception as e:
+                print(f"[warn] geometry parse failed on {local.name}: {e}", flush=True)
+
+        if geom_rows:
+            # we have series+subseries with geometry lock
+            category = detect_category(text or "")
+            for row in geom_rows:
+                new_records.append({
+                    "report_date": rd_str,
+                    "camp_name": row["camp"],
+                    "population": row["value"],
+                    "category": category,
+                    "series": row["series"],
+                    "subseries": row.get("subseries", ""),
+                    "source_url": url,
+                    "file_name": local.name,
+                    "extract_method": method or "unknown",
+                    "parse_notes": row.get("parse_notes", "geom_header_locked"),
+                    "parse_confidence": row.get("parse_confidence", 0.98),
+                })
+            time.sleep(0.05)
+            continue  # next file
+
+        # Fallback: text-line parsing
         if not (text or "").strip():
             new_records.append({
                 "report_date": rd_str, "camp_name": None, "population": None, "category": None,
-                "series": "unknown",
+                "series": "unknown", "subseries": "",
                 "source_url": url, "file_name": local.name, "extract_method": method or "none",
                 "parse_notes": "no_text_extracted", "parse_confidence": 0.0
             })
             continue
 
-        rows = parse_rows(text)
-        if not rows:
-            rows = [{
-                "camp_name": None, "population": None, "category": None,
-                "series": "unknown",
+        rows_text = parse_rows_text(text)
+        if not rows_text:
+            rows_text = [{
+                "camp": None, "series": "unknown", "subseries": "", "value": None,
                 "parse_notes": "no_rows_parsed", "parse_confidence": 0.0
             }]
-
-        for row in rows:
-            row.update({
+        for row in rows_text:
+            new_records.append({
                 "report_date": rd_str,
+                "camp_name": row.get("camp"),
+                "population": row.get("value"),
+                "category": detect_category(text or ""),
+                "series": row.get("series", "unknown"),
+                "subseries": row.get("subseries", ""),
                 "source_url": url,
                 "file_name": local.name,
                 "extract_method": method or "unknown",
+                "parse_notes": row.get("parse_notes", "text_line_locked"),
+                "parse_confidence": row.get("parse_confidence", 0.9),
             })
-            new_records.append(row)
-
-        time.sleep(0.05)  # polite
+        time.sleep(0.05)
 
     # ---------- Write LONG ----------
     df_new = pd.DataFrame.from_records(new_records)
-    if existing is not None and not existing.empty:
-        combined = pd.concat([existing, df_new], ignore_index=True)
+    if RESUME_MODE and OUT_LONG.exists() and OUT_LONG.stat().st_size:
+        try:
+            existing = pd.read_csv(OUT_LONG, dtype=str).fillna("")
+        except Exception:
+            existing = pd.DataFrame()
     else:
-        combined = df_new
+        existing = pd.DataFrame()
+
+    combined = pd.concat([existing, df_new], ignore_index=True) if not df_new.empty else existing
 
     if not combined.empty:
         with pd.option_context("mode.use_inf_as_na", True):
             combined["report_date"] = pd.to_datetime(combined["report_date"], errors="coerce")
+        # IMPORTANT: include subseries in dedupe so verified vs feeding both survive
         combined = (combined
                     .drop_duplicates(
-                        subset=["report_date","camp_name","series","source_url","file_name","extract_method","parse_notes"],
+                        subset=["report_date","camp_name","series","subseries","source_url","file_name","extract_method","parse_notes"],
                         keep="last")
-                    .sort_values(["report_date","camp_name","series"], na_position="last"))
+                    .sort_values(["report_date","camp_name","series","subseries"], na_position="last"))
         combined["report_date"] = combined["report_date"].dt.strftime("%Y-%m-01").fillna("")
 
     OUT_LONG.parent.mkdir(parents=True, exist_ok=True)
@@ -448,7 +664,7 @@ def main():
             tmp = tmp[tmp["population"].between(GLOBAL_MIN, GLOBAL_MAX)]
 
             def within_bounds(row):
-                camp = str(row["camp_name"])
+                camp = str(row["camp_name"]) if pd.notna(row["camp_name"]) else ""
                 val  = row["population"]
                 if camp in CAMP_BOUNDS and pd.notna(val):
                     lo, hi = CAMP_BOUNDS[camp]
@@ -477,6 +693,21 @@ def main():
     except Exception as e:
         print(f"[warn] could not generate wide CSV: {e}", flush=True)
         pd.DataFrame().to_csv(OUT_WIDE, index=False)
+
+    # ---------- Dual-series WIDE (audit) ----------
+    try:
+        if not combined.empty:
+            dual = combined.dropna(subset=["camp_name","population","series"]).copy()
+            dual["population"] = pd.to_numeric(dual["population"], errors="coerce")
+            dual = dual[dual["population"].between(GLOBAL_MIN, GLOBAL_MAX)]
+            dual["col"] = dual["report_date"] + "|" + dual["series"].str.lower()
+            dual_w = dual.pivot_table(index="camp_name", columns="col", values="population", aggfunc="first")
+            dual_w.to_csv(OUT_WIDE_DUAL)
+        else:
+            pd.DataFrame().to_csv(OUT_WIDE_DUAL, index=False)
+    except Exception as e:
+        print(f"[warn] could not generate dual wide CSV: {e}", flush=True)
+        pd.DataFrame().to_csv(OUT_WIDE_DUAL, index=False)
 
     print(f"[done] wrote {OUT_LONG} (+{len(df_new)} new rows, total {len(combined)})", flush=True)
 
