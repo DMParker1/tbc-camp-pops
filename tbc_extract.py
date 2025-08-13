@@ -255,21 +255,49 @@ def _group_lines(words, y_tol=2):
     return lines
 
 def detect_columns(page) -> Dict[str, Tuple[float, float]]:
+    """
+    Detect T(B)BC Verified / Feeding and UNHCR column x-spans.
+    Relaxed to handle multi-line headers like:
+        TBBC
+        Verified Caseload   Feeding Figure   MOI/ UNHCR Population
+    """
     words = page.extract_words(use_text_flow=True, y_tolerance=2, x_tolerance=1, keep_blank_chars=False)
     lines = _group_lines(words)
-    spans = {}
-    for L in lines[:80]:  # headers live near the top
-        t = L["text"]
-        for key, pat in HEADER_PATTERNS.items():
-            if pat.search(t):
-                if key not in spans:
-                    spans[key] = [L["x0"], L["x1"]]
-                else:
-                    spans[key][0] = min(spans[key][0], L["x0"])  # widen
-                    spans[key][1] = max(spans[key][1], L["x1"])
-    # flatten -> (x0,x1)
-    spans = {k: (v[0], v[1]) for k, v in spans.items()}
-    return spans
+
+    spans: Dict[str, List[float]] = {}
+
+    def widen(key: str, x0: float, x1: float):
+        if key not in spans:
+            spans[key] = [x0, x1]
+        else:
+            spans[key][0] = min(spans[key][0], x0)
+            spans[key][1] = max(spans[key][1], x1)
+
+    N = min(120, len(lines))  # header area
+    for i in range(N):
+        # Look across this line + the next two lines
+        win = lines[i:i+3]
+        if not win:
+            continue
+        window_text = " ".join(L["text"] for L in win)
+        x0 = min(L["x0"] for L in win)
+        x1 = max(L["x1"] for L in win)
+
+        # Use relaxed cues (multi-line) instead of single-line HEADER_PATTERNS
+        if re.search(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b).*verified", window_text, re.I) \
+           or (re.search(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b)", window_text, re.I) and re.search(r"verified(\\s+caseload)?", window_text, re.I)):
+            widen("tbbc_verified", x0, x1)
+
+        if re.search(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b).*(feeding|assisted)", window_text, re.I) \
+           or (re.search(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b)", window_text, re.I) and re.search(r"(feeding\\s+figure|feeding|assisted)", window_text, re.I)):
+            widen("tbbc_feeding", x0, x1)
+
+        if re.search(r"(?:\bMOI\b[^A-Za-z0-9/]*\\/\\s*)?\\bUNHCR\\b", window_text, re.I) and \
+           re.search(r"(population|verified)", window_text, re.I):
+            widen("unhcr", x0, x1)
+
+    # flatten to tuples
+    return {k: (v[0], v[1]) for k, v in spans.items()}
 
 def center_x(w):
     return (w["x0"] + w["x1"]) / 2.0
