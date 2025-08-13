@@ -47,9 +47,9 @@ report_date,source_url,file_name,origin_page,date_parse_method
 2011-07-01,https://www.theborderconsortium.org/media/2011-07-jul-map-tbbc-unhcr-1-.pdf,2011-07-jul-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
 2011-08-01,https://www.theborderconsortium.org/media/2011-08-aug-map-tbbc-unhcr-1-.pdf,2011-08-aug-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
 2011-09-01,https://www.theborderconsortium.org/media/2011-09-sep-map-tbbc-unhcr-1-.pdf,2011-09-sep-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
-2011-10-01,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,2011-10-oct-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
-2011-11-01,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,2011-11-nov-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
-2011-12-01,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,2011-12-dec-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
+2011-10-01,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,2011-10-oct-map-tbbc-unhcr-1-.pdf,candidate-generator,generator
+2011-11-01,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,2011-11-nov-map-tbbc-unhcr-1-.pdf,candidate-generator,generator
+2011-12-01,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,2011-12-dec-map-tbbc-unhcr-1-.pdf,candidate-generator,generator
 2012-01-01,https://www.theborderconsortium.org/media/2012-01-jan-map-tbbc-unhcr-1-.pdf,2012-01-jan-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
 2012-02-01,https://www.theborderconsortium.org/media/2012-02-feb-map-tbbc-unhcr-1-.pdf,2012-02-feb-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
 2012-03-01,https://www.theborderconsortium.org/media/2012-03-mar-map-tbbc-unhcr-1-.pdf,2012-03-mar-map-tbbc-unhcr-1-.pdf,https://www.theborderconsortium.org/resources/key-resources/camp-population/,yyyy-mm
