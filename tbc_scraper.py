@@ -341,7 +341,8 @@ def generate_candidates_df() -> pd.DataFrame:
         for u in urls:
             if head_or_get_exists(u):
                 picked = u
-                break if STOP_AFTER_FOUND else None
+                if STOP_AFTER_FOUND:
+                break
         # Optionally try ReliefWeb for the month
         if not picked:
             picked = reliefweb_find_pdf(y, m)
