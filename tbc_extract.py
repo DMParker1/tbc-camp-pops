@@ -717,8 +717,16 @@ def main():
             dfw["series_norm"] = dfw["series"].str.lower().replace({"tbc":"tbbc"})
             dfw = dfw.sort_values(["report_date","camp_name","series_norm"], key=lambda s: s.map({s:i for i,s in enumerate(SERIES_PREF)}))
             pref = dfw.drop_duplicates(subset=["report_date","camp_name"], keep="first")
-            wide = pref.pivot_table(index="camp_name", columns="report_date", values="population", aggfunc="first")
-            wide.to_csv(OUT_WIDE)
+            wide = (
+                pref.pivot_table(
+                    index="report_date",      # dates on index
+                    columns="camp_name",      # camps as columns
+                    values="population",
+                    aggfunc="first"
+                )
+                .sort_index()
+            )
+            wide.to_csv(OUT_WIDE, index_label="report_date")
         else:
             pd.DataFrame().to_csv(OUT_WIDE, index=False)
     except Exception as e:
