@@ -2,19 +2,24 @@
 
 ![scrape status](https://github.com/DMParker1/tbc-camp-pops/actions/workflows/scrape.yml/badge.svg)
 
-_Last updated: 2025-08-18 15:45 UTC_
+_Last updated: 2025-08-18 15:58 UTC_
 
-**Latest month:** **1970-01**
+**Latest month:** **2011-12**
 
 ### Yearly table (camps as rows)
 Values are the **latest available month** within each year (forward-filled inside the year).
 
-| Camp       | 1970   |
-|:-----------|:-------|
-| 2011-10-01 | 19,210 |
-| 2011-11-01 | 19,210 |
-| 2011-12-01 | 17,609 |
-| camp_name  |        |
+| Camp            | 2011   |
+|:----------------|:-------|
+| Ban Don Yang    | 3,883  |
+| Ban Mae Surin   | 3,579  |
+| Mae La          | 46,431 |
+| Mae La Oon      | 13,763 |
+| Mae Ra Ma Luang | 15,901 |
+| Nu Po           | 15,325 |
+| Nupo            | 8,914  |
+| Tham Hin        | 7,074  |
+| Umpiem Mai      | 17,609 |
 
 ## Data files
 

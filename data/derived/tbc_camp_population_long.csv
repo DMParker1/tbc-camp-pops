@@ -1,0 +1,49 @@
+report_date,camp_name,population,category,series,subseries,source_url,file_name,extract_method,parse_notes,parse_confidence
+2011-10-01,Ban Don Yang,4144,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Ban Don Yang,2792,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-10-01,Ban Mae Surin,3709,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Ban Mae Surin,2070,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-10-01,Mae La,50624,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Mae La,27890,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-10-01,Mae La Oon,14967,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Mae La Oon,10200,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-10-01,Mae Ra Ma Luang,17472,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Mae Ra Ma Luang,10238,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-10-01,Nu Po,16689,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Nupo,8939,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-10-01,Tham Hin,7796,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Tham Hin,4279,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-10-01,Umpiem Mai,19210,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,text_line_locked,0.9
+2011-10-01,Umpiem Mai,11111,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Ban Don Yang,3867,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Ban Don Yang,2804,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Ban Mae Surin,3579,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Ban Mae Surin,1989,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Mae La,50626,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Mae La,27886,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Mae La Oon,13720,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Mae La Oon,10161,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Mae Ra Ma Luang,15863,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Mae Ra Ma Luang,10239,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Nu Po,16689,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Nupo,8944,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Tham Hin,7037,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Tham Hin,4270,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-11-01,Umpiem Mai,19210,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,text_line_locked,0.9
+2011-11-01,Umpiem Mai,11109,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Ban Don Yang,3883,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Ban Don Yang,2808,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Ban Mae Surin,3579,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Ban Mae Surin,1916,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Mae La,46431,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Mae La,27629,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Mae La Oon,13763,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Mae La Oon,10136,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Mae Ra Ma Luang,15901,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Mae Ra Ma Luang,10239,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Nu Po,15325,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Nupo,8914,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Tham Hin,7074,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Tham Hin,4281,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
+2011-12-01,Umpiem Mai,17609,refugee,tbbc,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,text_line_locked,0.9
+2011-12-01,Umpiem Mai,11017,refugee,unhcr,verified,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-geometry,geom_header_locked,0.98
