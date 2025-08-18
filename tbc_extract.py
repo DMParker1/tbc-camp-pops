@@ -84,7 +84,25 @@ CAMP_ALIASES = {
 ACTIVE_MAP = {
     # if needed, (start,end) bounds; left as open for now; can be filled via lineage file
 }
+# --- Camp name normalizer (aliases -> canonical) ---
+def _build_canon_map():
+    m = {}
+    # map canonicals to themselves
+    for canon in CANONICAL_ORDER:
+        m[canon.lower()] = canon
+    # map each alias to its canonical
+    for canon, aliases in CAMP_ALIASES.items():
+        m[canon.lower()] = canon
+        for a in aliases:
+            m[a.lower()] = canon
+    return m
 
+_CANON_MAP = _build_canon_map()
+
+def norm_camp(name: str) -> str:
+    if not name:
+        return name
+    return _CANON_MAP.get(str(name).strip().lower(), name)
 CANON_BOUNDS = {
     "Mae La":          (10_000,  70_000),
     "Umpiem Mai":      (3_000,   45_000),
@@ -598,7 +616,7 @@ def main():
             for row in geom_rows:
                 new_records.append({
                     "report_date": rd_str,
-                    "camp_name": row["camp"],
+                    "camp_name": norm_camp(row["camp"]),
                     "population": row["value"],
                     "category": category,
                     "series": _norm_series(row["series"]),
@@ -660,7 +678,7 @@ def main():
         for row in rows_text:
             new_records.append({
                 "report_date": rd_str,
-                "camp_name": row.get("camp"),
+                "camp_name": norm_camp(row.get("camp")),
                 "population": row.get("value"),
                 "category": detect_category(text or ""),
                 "series": _norm_series(row.get("series", "unknown")),
@@ -701,6 +719,7 @@ def main():
             (combined["population"].isna()) |
             ((combined["population"] >= GLOBAL_MIN) & (combined["population"] <= GLOBAL_MAX))
         ]
+        combined["camp_name"] = combined["camp_name"].map(norm_camp)
         combined.to_csv(OUT_LONG, index=False)
     else:
         pd.DataFrame().to_csv(OUT_LONG, index=False)
