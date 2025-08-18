@@ -26,7 +26,7 @@ Values are the **latest available month** within each year (forward-filled insid
 - `data/derived/tbc_camp_population_wide.csv` — pivot (camps as columns)
 
 <!-- WORKFLOW_INPUTS_START -->
-### Workflow inputs (quick reference)
+### Workflow inputs (quick reference - for more detailes go to [quick-start.md](https://github.com/DMParker1/tbc-camp-pops/blob/main/quick-start.md))
 - extract_since: YYYY-MM-DD (lower bound for extraction, inclusive)
 - extract_until: YYYY-MM-DD (upper bound for extraction, inclusive)
 - extract_max_files: integer (0 = skip extract; still build README)
