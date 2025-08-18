@@ -154,18 +154,78 @@ def download(url: str, report_date_str: str) -> Optional[Path]:
         return None
 
 def load_lineage():
-    # Placeholder; if a lineage file exists, load and map bounds/aliases.
-    canon = CANONICAL_ORDER
-    syns  = CAMP_ALIASES
+    canon = set(CANONICAL_ORDER)
+    syns  = dict(CAMP_ALIASES)
     active = ACTIVE_MAP
+
     ref = Path("data/reference/camp_lineage.csv")
+    rules = []   # list of dicts per row
+    merges = {}  # canonical -> (merge_into, merge_start_date)
+
+    def _d(s):
+        s = (s or "").strip()
+        if not s:
+            return None
+        try:
+            return pd.to_datetime(s, errors="coerce").date()
+        except Exception:
+            return None
+
     if ref.exists():
         try:
             df = pd.read_csv(ref, dtype=str).fillna("")
-            # minimal hook: could constrain by (start,end)
+            for _, r in df.iterrows():
+                c = r["canonical"].strip()
+                if not c:
+                    continue
+                canon.add(c)
+                al = [a.strip() for a in (r.get("aliases","").split("|")) if a.strip()]
+                start = _d(r.get("start",""))
+                end   = _d(r.get("end",""))
+                rules.append({"canonical": c, "aliases": al, "start": start, "end": end})
+                if al:
+                    syns.setdefault(c, [])
+                    for a in al:
+                        if a not in syns[c]:
+                            syns[c].append(a)
+                mi = (r.get("merge_into","") or "").strip()
+                ms = _d(r.get("merge_start",""))
+                if mi:
+                    merges[c] = (mi, ms)
         except Exception as e:
             print(f"[warn] could not load lineage file: {e}", flush=True)
-    return canon, syns, active
+
+    # Return canonical list (sorted), alias map, active map, and merge map
+    return sorted(canon), syns, active, merges
+
+def norm_camp_by_date(name: str, report_date: Optional[dt.date], canon_list, alias_map, merges):
+    if not name:
+        return name
+    s = str(name).strip()
+    low = s.lower()
+
+    # 1) direct canonical hit
+    if any(low == c.lower() for c in canon_list):
+        canon = next(c for c in canon_list if c.lower() == low)
+    else:
+        # 2) alias → canonical (use time bounds if present in lineage)
+        canon = s
+        for c in canon_list:
+            for a in alias_map.get(c, []):
+                if low == a.strip().lower():
+                    canon = c
+                    break
+            if canon == c:
+                break
+
+    # 3) apply merge if configured and start date reached
+    tgt = merges.get(canon)
+    if tgt:
+        merge_into, merge_start = tgt
+        if (report_date is None) or (merge_start is None) or (report_date >= merge_start):
+            canon = merge_into
+
+    return canon
 
 def is_active(camp: str, report_date: dt.date, active_map) -> bool:
     if camp not in active_map:
@@ -539,7 +599,8 @@ def main():
         df_idx = df_idx.head(EXTRACT_MAX_FILES)
 
     candidates = df_idx.to_dict(orient="records")
-
+    canon, syns, active_map, merges = load_lineage()
+  
     ensure_dirs()
     new_records = []
 
@@ -548,6 +609,12 @@ def main():
         url         = (r.get("source_url") or "").strip()
         fname       = (r.get("file_name")  or "").strip()
         rd_str      = report_date.strftime("%Y-%m-01") if pd.notna(report_date) else ""
+        rd_date = None
+        if rd_str:
+            try:
+                rd_date = dt.datetime.strptime(rd_str, "%Y-%m-%d").date()
+            except Exception:
+                rd_date = None
         if not url:
             continue
 
