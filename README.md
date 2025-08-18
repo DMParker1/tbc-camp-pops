@@ -2,12 +2,19 @@
 
 ![scrape status](https://github.com/DMParker1/tbc-camp-pops/actions/workflows/scrape.yml/badge.svg)
 
-_Last updated: 2025-08-18 15:32 UTC_
+_Last updated: 2025-08-18 15:45 UTC_
+
+**Latest month:** **1970-01**
 
 ### Yearly table (camps as rows)
 Values are the **latest available month** within each year (forward-filled inside the year).
 
-_No data available yet._
+| Camp       | 1970   |
+|:-----------|:-------|
+| 2011-10-01 | 19,210 |
+| 2011-11-01 | 19,210 |
+| 2011-12-01 | 17,609 |
+| camp_name  |        |
 
 ## Data files
 
