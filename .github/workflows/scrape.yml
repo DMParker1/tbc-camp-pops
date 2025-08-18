@@ -118,6 +118,16 @@ jobs:
         run: |
           python -u tbc_extract.py
 
+      - name: Upload derived CSVs (artifact)
+        if: always()                 # still runs if extraction step fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: derived-csvs-${{ github.run_id }}
+          path: |
+            data/derived/*.csv
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Build README table
         run: |
           python -u make_readme.py
