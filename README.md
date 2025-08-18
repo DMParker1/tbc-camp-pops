@@ -2,7 +2,7 @@
 
 ![scrape status](https://github.com/DMParker1/tbc-camp-pops/actions/workflows/scrape.yml/badge.svg)
 
-_Last updated: 2025-08-18 15:58 UTC_
+_Last updated: 2025-08-18 16:31 UTC_
 
 **Latest month:** **2011-12**
 
@@ -17,7 +17,6 @@ Values are the **latest available month** within each year (forward-filled insid
 | Mae La Oon      | 13,763 |
 | Mae Ra Ma Luang | 15,901 |
 | Nu Po           | 15,325 |
-| Nupo            | 8,914  |
 | Tham Hin        | 7,074  |
 | Umpiem Mai      | 17,609 |
 
