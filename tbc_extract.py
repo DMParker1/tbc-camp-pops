@@ -226,7 +226,7 @@ def detect_columns(page) -> Dict[str, Tuple[float, float]]:
     # Direct column titles
     ver_span  = union_span(lambda t: rx_verified.search(t) and not rx_unhcr.search(t))
     feed_span = union_span(lambda t: rx_feeding.search(t))
-    un_span   = union_span(lambda t: rx_unhcr.search(t) and rx_unhcr_aux.search(t))
+    un_span   = union_span(lambda t: rx_unhcr.search(t) and rx_unh_aux.search(t))
 
     if ver_span:  spans["tbbc_verified"] = ver_span
     if feed_span: spans["tbbc_feeding"]  = feed_span
