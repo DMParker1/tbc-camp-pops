@@ -74,7 +74,6 @@ CANONICAL_ORDER = [
 ]
 CAMP_ALIASES = {
     "Nu Po": ["Nupo","Nu  Po","Nu  Po"],
-    "Nupo": ["Nu Po","Nu  Po","Nupo"],
     "Mae La Oon": ["Mae La Oon","Mae La Oon (MLA)","Mae  La  Oon"],
     "Mae Ra Ma Luang": ["Mae Ra Ma Luang","Mae  Ra  Ma  Luang","Mae Ra Ma Laung"],
     "Umpiem Mai": ["Umphiem","Umpiem","Umpiem  Mai","Umphiem Mai"],
@@ -392,7 +391,7 @@ def extract_values_from_page(page, report_date: dt.date, source_url: str, cols: 
 
 def parse_pdf_geometry(pdf_path: Path, report_date: dt.date, source_url: str) -> List[Dict]:
     import pdfplumber
-    canon, syns, active_map = load_lineage()
+    canon, syns, active_map, merges = load_lineage()
     all_rows: List[Dict] = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
@@ -683,7 +682,7 @@ def main():
             for row in geom_rows:
                 new_records.append({
                     "report_date": rd_str,
-                    "camp_name": norm_camp(row["camp"]),
+                    "camp_name": norm_camp_by_date(row["camp"], rd_date, canon, syns, merges),
                     "population": row["value"],
                     "category": category,
                     "series": _norm_series(row["series"]),
@@ -745,7 +744,7 @@ def main():
         for row in rows_text:
             new_records.append({
                 "report_date": rd_str,
-                "camp_name": norm_camp(row.get("camp")),
+                "camp_name": norm_camp_by_date(row.get("camp"), rd_date, canon, syns, merges),
                 "population": row.get("value"),
                 "category": detect_category(text or ""),
                 "series": _norm_series(row.get("series", "unknown")),
@@ -787,6 +786,14 @@ def main():
             ((combined["population"] >= GLOBAL_MIN) & (combined["population"] <= GLOBAL_MAX))
         ]
         combined["camp_name"] = combined["camp_name"].map(norm_camp)
+        combined["camp_name"] = combined.apply(
+            lambda r: norm_camp_by_date(
+                r["camp_name"],
+                pd.to_datetime(r["report_date"], errors="coerce").date() if pd.notna(r["report_date"]) else None,
+                canon, syns, merges
+            ),
+            axis=1
+        )
         combined.to_csv(OUT_LONG, index=False)
     else:
         pd.DataFrame().to_csv(OUT_LONG, index=False)
