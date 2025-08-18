@@ -1,0 +1,4 @@
+report_date,camp_name,population,category,series,subseries,source_url,file_name,extract_method,parse_notes,parse_confidence
+2011-10-01,,,refugee,unknown,,https://www.theborderconsortium.org/media/2011-10-oct-map-tbbc-unhcr-1-.pdf,44b18a4ca4b51cea.pdf,pdf-text-no-ocr,no_rows_parsed,0.0
+2011-11-01,,,refugee,unknown,,https://www.theborderconsortium.org/media/2011-11-nov-map-tbbc-unhcr-1-.pdf,5e0f6b701cc32dbd.pdf,pdf-text-no-ocr,no_rows_parsed,0.0
+2011-12-01,,,refugee,unknown,,https://www.theborderconsortium.org/media/2011-12-dec-map-tbbc-unhcr-1-.pdf,d1ec9f41f13f59b0.pdf,pdf-text-no-ocr,no_rows_parsed,0.0
