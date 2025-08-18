@@ -2,23 +2,23 @@
 
 ![scrape status](https://github.com/DMParker1/tbc-camp-pops/actions/workflows/scrape.yml/badge.svg)
 
-_Last updated: 2025-08-18 16:31 UTC_
+_Last updated: 2025-08-18 20:19 UTC_
 
-**Latest month:** **2011-12**
+**Latest month:** **2000-12**
 
 ### Yearly table (camps as rows)
 Values are the **latest available month** within each year (forward-filled inside the year).
 
-| Camp            | 2011   |
-|:----------------|:-------|
-| Ban Don Yang    | 3,883  |
-| Ban Mae Surin   | 3,579  |
-| Mae La          | 46,431 |
-| Mae La Oon      | 13,763 |
-| Mae Ra Ma Luang | 15,901 |
-| Nu Po           | 15,325 |
-| Tham Hin        | 7,074  |
-| Umpiem Mai      | 17,609 |
+| Camp            | 1998   | 1999   | 2000   |
+|:----------------|:-------|:-------|:-------|
+| Ban Don Yang    | 1,736  | 2,011  | 3,653  |
+| Ban Mae Surin   | 2,772  | 2,861  | 2,959  |
+| Ban Mai Nai Soi | 3,231  | 3,508  | 3,871  |
+| Mae La          | 31,680 | 32,875 | 37,070 |
+| Mae Ra Ma Luang | 7,256  | 7,802  | 8,743  |
+| Nu Po           | 8,817  | 8,107  | 8,777  |
+| Tham Hin        | 8,306  | 7,748  | 8,526  |
+| Umpiem Mai      | 2,655  | 16,300 | 16,085 |
 
 ## Data files
 
@@ -26,7 +26,7 @@ Values are the **latest available month** within each year (forward-filled insid
 - `data/derived/tbc_camp_population_wide.csv` — pivot (camps as columns)
 
 <!-- WORKFLOW_INPUTS_START -->
-### Workflow inputs (quick reference - for more detailes go to [quick-start.md](https://github.com/DMParker1/tbc-camp-pops/blob/main/quick-start.md))
+### Workflow inputs (quick reference)
 - extract_since: YYYY-MM-DD (lower bound for extraction, inclusive)
 - extract_until: YYYY-MM-DD (upper bound for extraction, inclusive)
 - extract_max_files: integer (0 = skip extract; still build README)

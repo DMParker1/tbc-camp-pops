@@ -1,0 +1,182 @@
+report_date,camp_name,population,category,series,subseries,source_url,file_name,extract_method,parse_notes,parse_confidence
+1992-08-01,,,refugee,unknown,,https://www.theborderconsortium.org/wp-content/uploads/2021/03/Aug-92-camps.pdf,d28624a6dce712f1.pdf,pdf-text-no-ocr,no_text_extracted,0.0
+1992-12-01,,,refugee,unknown,,https://www.theborderconsortium.org/wp-content/uploads/2021/03/Dec-92-camp.pdf,e6f77f35e3671864.pdf,pdf-text-no-ocr,no_text_extracted,0.0
+1994-12-01,,,refugee,unknown,,https://www.theborderconsortium.org/wp-content/uploads/2021/03/Dec-94-camp.pdf,61372eed739cdf64.pdf,pdf-text-no-ocr,no_text_extracted,0.0
+1995-08-01,,,refugee,unknown,,https://www.theborderconsortium.org/wp-content/uploads/2021/03/Aug-95-camp.pdf,d4ee7728a4074e5c.pdf,pdf-text-no-ocr,no_text_extracted,0.0
+1996-12-01,,,refugee,unknown,,https://www.theborderconsortium.org/wp-content/uploads/2021/03/Dec-96-camp.pdf,a5916138cadc0902.pdf,pdf-text-no-ocr,no_text_extracted,0.0
+1997-08-01,,,refugee,unknown,,https://www.theborderconsortium.org/wp-content/uploads/2021/03/Aug-97-camp.pdf,ae6553d036f15f87.pdf,pdf-text-no-ocr,no_text_extracted,0.0
+1998-12-01,Ban Don Yang,1736.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1998-12-01,Ban Mae Surin,2772.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1998-12-01,Ban Mai Nai Soi,3231.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1998-12-01,Mae La,31680.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1998-12-01,Mae Ra Ma Luang,7256.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1998-12-01,Nu Po,8817.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1998-12-01,Tham Hin,8306.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1998-12-01,Umpiem Mai,2655.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1998-12-dec.pdf,b96fb0e5c29ce006.pdf,pdf-text-no-ocr,text_line_locked,0.9
+1999-08-01,Ban Don Yang,2007.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Ban Mae Surin,2849.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Ban Mai Nai Soi,3403.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Mae La,31763.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Mae Ra Ma Luang,7639.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Nu Po,8026.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Nu Po,112.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,geom_header_locked,0.98
+1999-08-01,Tham Hin,9078.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Tham Hin,269.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,geom_header_locked,0.98
+1999-08-01,Umpiem Mai,1550.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,text_line_locked,0.9
+1999-08-01,Umpiem Mai,1550.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-08-aug.pdf,bb97ed9afa427477.pdf,pdf-geometry,geom_header_locked,0.98
+1999-09-01,Ban Don Yang,2007.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Ban Mae Surin,2871.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Ban Mai Nai Soi,3464.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Mae La,31803.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Mae Ra Ma Luang,7652.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Nu Po,8050.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Tham Hin,9078.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Umpiem Mai,7716.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,text_line_locked,0.9
+1999-09-01,Umpiem Mai,6166.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-09-sep.pdf,b0359bbf4d328db9.pdf,pdf-geometry,geom_header_locked,0.98
+1999-10-01,Ban Don Yang,2011.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Ban Mae Surin,2876.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Ban Mai Nai Soi,3464.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Mae La,32461.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Mae La,658.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,geom_header_locked,0.98
+1999-10-01,Mae Ra Ma Luang,7661.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Nu Po,8120.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Tham Hin,8830.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Tham Hin,248.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,geom_header_locked,0.98
+1999-10-01,Umpiem Mai,11216.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,text_line_locked,0.9
+1999-10-01,Umpiem Mai,3500.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-10-oct.pdf,e34e06a66084705d.pdf,pdf-geometry,geom_header_locked,0.98
+1999-11-01,Ban Don Yang,2011.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Ban Mae Surin,2852.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Ban Mai Nai Soi,3492.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Mae La,32036.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Mae La,425.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,geom_header_locked,0.98
+1999-11-01,Mae Ra Ma Luang,7736.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Nu Po,8189.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Tham Hin,7748.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Tham Hin,1082.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,geom_header_locked,0.98
+1999-11-01,Umpiem Mai,16300.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,text_line_locked,0.9
+1999-11-01,Umpiem Mai,5084.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-11-nov.pdf,5ccb4366d45dde1f.pdf,pdf-geometry,geom_header_locked,0.98
+1999-12-01,Ban Don Yang,2011.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+1999-12-01,Ban Mae Surin,2861.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+1999-12-01,Ban Mai Nai Soi,3508.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+1999-12-01,Mae La,32875.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+1999-12-01,Mae La,839.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,geom_header_locked,0.98
+1999-12-01,Mae Ra Ma Luang,7802.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+1999-12-01,Nu Po,8107.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+1999-12-01,Tham Hin,7748.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+1999-12-01,Umpiem Mai,16300.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-1999-12-dec.pdf,e67ea96155887eaa.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Ban Don Yang,2011.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Ban Mae Surin,2907.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Ban Mai Nai Soi,3531.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Mae La,33045.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Mae La,170.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,geom_header_locked,0.98
+2000-01-01,Mae Ra Ma Luang,7864.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Nu Po,8107.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Tham Hin,7748.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Umpiem Mai,15544.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,text_line_locked,0.9
+2000-01-01,Umpiem Mai,756.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-01-jan.pdf,425c3e70468296c6.pdf,pdf-geometry,geom_header_locked,0.98
+2000-02-01,Ban Don Yang,3441.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-02-01,Ban Don Yang,1430.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,geom_header_locked,0.98
+2000-02-01,Ban Mae Surin,2907.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-02-01,Ban Mai Nai Soi,3562.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-02-01,Mae La,33136.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-02-01,Mae Ra Ma Luang,7988.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-02-01,Mae Ra Ma Luang,124.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,geom_header_locked,0.98
+2000-02-01,Nu Po,8491.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-02-01,Nu Po,384.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,geom_header_locked,0.98
+2000-02-01,Tham Hin,7748.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-02-01,Umpiem Mai,15531.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-02-feb.pdf,22ca9660ec55c391.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Ban Don Yang,3441.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Ban Mae Surin,2976.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Ban Mai Nai Soi,3584.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Mae La,33186.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Mae Ra Ma Luang,8103.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Mae Ra Ma Luang,115.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,geom_header_locked,0.98
+2000-03-01,Nu Po,8578.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Tham Hin,7748.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-03-01,Umpiem Mai,15627.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-03-mar.pdf,20eb76bcd29690eb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Ban Don Yang,3441.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Ban Mae Surin,2913.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Ban Mai Nai Soi,3615.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Mae La,33223.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Mae Ra Ma Luang,8164.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Nu Po,8645.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Tham Hin,8188.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-04-01,Tham Hin,440.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,geom_header_locked,0.98
+2000-04-01,Umpiem Mai,15708.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-04-apr.pdf,83df3192c5768edb.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Ban Don Yang,3436.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Ban Mae Surin,2912.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Ban Mai Nai Soi,3631.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Mae La,33890.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Mae La,667.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,geom_header_locked,0.98
+2000-05-01,Mae Ra Ma Luang,8437.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Mae Ra Ma Luang,273.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,geom_header_locked,0.98
+2000-05-01,Nu Po,8736.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Tham Hin,8188.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Umpiem Mai,16111.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,text_line_locked,0.9
+2000-05-01,Umpiem Mai,403.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-05-may.pdf,8a52346ddc046143.pdf,pdf-geometry,geom_header_locked,0.98
+2000-06-01,Ban Don Yang,3382.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Ban Mae Surin,2934.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Ban Mai Nai Soi,3660.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Mae La,34268.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Mae La,378.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,geom_header_locked,0.98
+2000-06-01,Mae Ra Ma Luang,8610.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Mae Ra Ma Luang,173.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,geom_header_locked,0.98
+2000-06-01,Nu Po,8755.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Tham Hin,8221.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Umpiem Mai,15732.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,text_line_locked,0.9
+2000-06-01,Umpiem Mai,379.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-06-jun.pdf,f752ad084a06db8b.pdf,pdf-geometry,geom_header_locked,0.98
+2000-07-01,Ban Don Yang,3390.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-07-01,Ban Mae Surin,2905.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-07-01,Ban Mai Nai Soi,3733.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-07-01,Mae La,34284.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-07-01,Mae Ra Ma Luang,8658.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-07-01,Nu Po,8804.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-07-01,Tham Hin,8242.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-07-01,Umpiem Mai,15668.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-07-jul.pdf,c15b90aac476b60d.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Ban Don Yang,3511.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Ban Don Yang,121.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,geom_header_locked,0.98
+2000-08-01,Ban Mae Surin,2932.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Ban Mai Nai Soi,3759.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Mae La,37701.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Mae La,3417.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,geom_header_locked,0.98
+2000-08-01,Mae Ra Ma Luang,8679.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Nu Po,8813.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Tham Hin,8106.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-08-01,Tham Hin,136.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,geom_header_locked,0.98
+2000-08-01,Umpiem Mai,15587.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-08-aug.pdf,3a320776df7ec6b7.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Ban Don Yang,3568.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Ban Mae Surin,2933.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Ban Mai Nai Soi,3810.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Mae La,36870.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Mae La,831.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,geom_header_locked,0.98
+2000-09-01,Mae Ra Ma Luang,8689.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Nu Po,8842.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Tham Hin,8461.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Tham Hin,355.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,geom_header_locked,0.98
+2000-09-01,Umpiem Mai,15961.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,text_line_locked,0.9
+2000-09-01,Umpiem Mai,374.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-09-sep.pdf,7b20c6ec9598cd77.pdf,pdf-geometry,geom_header_locked,0.98
+2000-10-01,Ban Don Yang,3588.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Ban Mae Surin,2950.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Ban Mai Nai Soi,3834.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Mae La,36941.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Mae Ra Ma Luang,8689.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Nu Po,8823.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Tham Hin,8483.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Umpiem Mai,16076.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,text_line_locked,0.9
+2000-10-01,Umpiem Mai,115.0,refugee,unhcr,verified,https://www.theborderconsortium.org/media/map-2000-10-oct.pdf,cc01dfe61ee1f78b.pdf,pdf-geometry,geom_header_locked,0.98
+2000-11-01,Ban Don Yang,3597.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-11-01,Ban Mae Surin,2950.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-11-01,Ban Mai Nai Soi,3866.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-11-01,Mae La,36977.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-11-01,Mae Ra Ma Luang,8720.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-11-01,Nu Po,8825.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-11-01,Tham Hin,8501.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-11-01,Umpiem Mai,16069.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-11-nov.pdf,6b51bb18fecffd2f.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Ban Don Yang,3653.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Ban Mae Surin,2959.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Ban Mai Nai Soi,3871.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Mae La,37070.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Mae Ra Ma Luang,8743.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Nu Po,8777.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Tham Hin,8526.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
+2000-12-01,Umpiem Mai,16085.0,refugee,tbbc,verified,https://www.theborderconsortium.org/media/map-2000-12-dec.pdf,5ac2e4f357807b27.pdf,pdf-geometry,text_line_locked,0.9
