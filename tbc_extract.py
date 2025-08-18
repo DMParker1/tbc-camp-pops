@@ -70,7 +70,7 @@ GLOBAL_MAX = 200_000
 
 CANONICAL_ORDER = [
     "Ban Mai Nai Soi","Ban Mae Surin","Mae La Oon","Mae Ra Ma Luang",
-    "Mae La","Umpiem Mai","Nupo","Nu Po","Ban Don Yang","Tham Hin"
+    "Mae La","Umpiem Mai", "Nu Po","Ban Don Yang","Tham Hin"
 ]
 CAMP_ALIASES = {
     "Nu Po": ["Nupo","Nu  Po","Nu  Po"],
