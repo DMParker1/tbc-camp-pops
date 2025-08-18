@@ -240,7 +240,7 @@ def load_lineage() -> Tuple[List[str], Dict[str, List[str]], Dict[str, Tuple[Opt
     return canon, syns, active
 
 
-def is_active(camp: str, report_date: dt.date, active_map: Dict[str, Tuple[Optional[dt.date], Optional[dt.date]]] ):
+def is_active(camp: str, report_date: dt.date, active_map: Dict[str, Tuple[Optional[dt.date], Optional[dt.date]]]):
     if camp not in active_map:
         return True
     st, en = active_map[camp]
@@ -252,21 +252,6 @@ def is_active(camp: str, report_date: dt.date, active_map: Dict[str, Tuple[Optio
 
 # ---------- Geometry parsing (pdfplumber) ----------
 NUM_RE = re.compile(r"^[\s]*[0-9][0-9,]*[\s]*$")
-
-def parse_int_relaxed(token: str):
-    """
-    Return an int if token contains a plausible population number,
-    even if it has footnote marks or stray punctuation; else None.
-    """
-    if token is None:
-        return None
-    digits = re.sub(r"[^\d]", "", str(token))
-    if len(digits) < 3:   # ignore very small / non-population tokens
-        return None
-    try:
-        return int(digits)
-    except Exception:
-        return None
 
 HEADER_PATTERNS = {
     "tbbc_verified": re.compile(r"(?:\bTBC\b|\bTBBC\b|\bBBC\b).*verified", re.I),
@@ -282,8 +267,8 @@ def _group_lines(words, y_tol=2):
         for L in lines:
             if abs(L["top"] - w["top"]) <= y_tol:
                 L["words"].append(w)
-                L["top"] = min(L["top"], w["top"])  # tighten
-                L["bottom"] = max(L["bottom"], w["bottom"])  # expand
+                L["top"] = min(L["top"], w["top"])
+                L["bottom"] = max(L["bottom"], w["bottom"])
                 placed = True
                 break
         if not placed:
@@ -321,19 +306,23 @@ def detect_columns(page) -> Dict[str, Tuple[float, float]]:
     if feed_span: spans["tbbc_feeding"]  = feed_span
     if un_span:   spans["unhcr"]         = un_span
 
-    # Fallback: if only UNHCR was found, infer two TBBC bands to the left from numeric clusters
-    if "unhcr" in spans and ("tbbc_verified" not in spans and "tbbc_feeding" not in spans):
-        mid_x = (spans["unhcr"][0] + spans["unhcr"][1]) / 2.0
-        nums_left = [w for w in words if NUM_RE.match(w["text"]) and w["x1"] < mid_x]
-        if nums_left:
-            xs = sorted([(w["x0"], w["x1"]) for w in nums_left])
-            mids = sorted([(a + b) / 2 for a, b in xs])
-            if len(mids) >= 2:
-                med = mids[len(mids) // 2]
-                left  = [(a, b) for a, b in xs if (a + b) / 2 <= med]
-                right = [(a, b) for a, b in xs if (a + b) / 2 >  med]
-                if left:  spans["tbbc_verified"] = (min(a for a, _ in left),  max(b for _, b in left))
-                if right: spans["tbbc_feeding"]  = (min(a for a, _ in right), max(b for _, b in right))
+    # --- Fallback: anchor UNHCR by token if not detected above ---
+    if "unhcr" not in spans:
+        un_tokens = [w for w in words if re.search(r"\bUNHCR\b|\bMOI\b", w.get("text",""), re.I)]
+        if un_tokens:
+            x0_un = min(w["x0"] for w in un_tokens)
+            x1_un = max(w["x1"] for w in un_tokens)
+            page_right = max(w["x1"] for w in words)
+            spans["unhcr"] = (x0_un - 5, page_right + 5)
+
+    # If UNHCR exists, clamp TBBC spans strictly to its left so we never swallow UNHCR values
+    if "unhcr" in spans:
+        un_x0 = spans["unhcr"][0]
+        for key in ("tbbc_verified", "tbbc_feeding"):
+            if key in spans:
+                x0, x1 = spans[key]
+                spans[key] = (x0, min(x1, un_x0 - 2))
+
     return spans
 
 
@@ -345,7 +334,7 @@ def center_y(w):
     return (w["top"] + w["bottom"]) / 2.0
 
 
-def match_camp_from_text(text: str, canon_ordered: List[str], syns: Dict[str, List[str]] ) -> Optional[str]:
+def match_camp_from_text(text: str, canon_ordered: List[str], syns: Dict[str, List[str]]) -> Optional[str]:
     lab = _norm(text)
     for canon in canon_ordered:
         for v in syns.get(canon, [canon]):
@@ -375,29 +364,15 @@ def segment_rows(page, canon_ordered, syns, report_date: dt.date, active_map, y_
     return rows
 
 
-def extract_values_from_page(page, report_date: dt.date, source_url: str,
-                             cols: Dict[str, Tuple[float, float]], rows):
-    # Pull words from the page
+def extract_values_from_page(page, report_date: dt.date, source_url: str, cols: Dict[str, Tuple[float, float]], rows):
     words = page.extract_words(use_text_flow=True, y_tolerance=2, x_tolerance=1, keep_blank_chars=False)
-
-    # Collect numeric-like tokens, tolerating footnote marks (e.g., 50,624*, 46,222¹)
-    num_tokens = []
-    for w in words:
-        val = parse_int_relaxed(w.get("text", ""))
-        if val is not None:
-            num_tokens.append((w, val))
-
+    numerics = [w for w in words if NUM_RE.match(w["text"])]
     out = []
     for row in rows:
         y0, y1 = row["y0"], row["y1"]
-
-        # keep only numbers whose vertical center lies within this camp row band
-        in_row = [(w, v) for (w, v) in num_tokens if y0 <= center_y(w) <= y1]
-
-        for (w, val) in in_row:
+        in_row = [w for w in numerics if y0 <= center_y(w) <= y1]
+        for w in in_row:
             cx = center_x(w)
-
-            # Determine series by column band
             series, subseries = None, ""
             if "tbbc_verified" in cols and cols["tbbc_verified"][0] <= cx <= cols["tbbc_verified"][1]:
                 series, subseries = "tbbc", "verified"
@@ -406,13 +381,11 @@ def extract_values_from_page(page, report_date: dt.date, source_url: str,
             elif "unhcr" in cols and cols["unhcr"][0] <= cx <= cols["unhcr"][1]:
                 series, subseries = "unhcr", "verified"
             else:
-                continue  # skip numbers outside the recognized column spans
-
-            # Sanity / per-camp bounds
+                continue
+            val = int(re.sub(r"[^\d]", "", w["text"]))
             lo, hi = CAMP_BOUNDS.get(row["camp"], (GLOBAL_MIN, GLOBAL_MAX))
             if not (lo <= val <= hi):
                 continue
-
             out.append({
                 "date": report_date.strftime("%Y-%m-%d"),
                 "camp": row["camp"],
@@ -671,6 +644,27 @@ def main():
                 print(f"[warn] geometry parse failed on {local.name}: {e}", flush=True)
 
         if geom_rows:
+            # If geometry found no UNHCR values, supplement via embedded-text fallback (no OCR)
+            have_unhcr = any(rr.get("series") == "unhcr" for rr in geom_rows)
+            if not have_unhcr:
+                try:
+                    import pdfplumber
+                    parts = []
+                    with pdfplumber.open(local) as pdf:
+                        for p in pdf.pages:
+                            t = p.extract_text(x_tolerance=2, y_tolerance=2) or ""
+                            if t.strip():
+                                parts.append(t)
+                    embedded_text = "\n".join(parts)
+                except Exception:
+                    embedded_text = ""
+                if embedded_text.strip():
+                    extra = parse_rows_text(embedded_text)
+                    have_keys = {(rr["camp"], rr["series"], rr.get("subseries","")) for rr in geom_rows}
+                    for er in extra:
+                        if er.get("series") == "unhcr" and (er["camp"], er["series"], er.get("subseries","")) not in have_keys:
+                            geom_rows.append(er)
+
             category = "refugee"
             for row in geom_rows:
                 new_records.append({
